@@ -57,18 +57,47 @@
     margin-top:2px;
   }
   .header-row{
-    display:flex; align-items:flex-start; justify-content:space-between;
+    display:flex; align-items:center; gap:12px;
     max-width:520px; margin:0 auto;
   }
-  .header-icons{ display:flex; gap:8px; margin-top:1px; }
-  .icon-btn{
-    width:38px; height:38px; border-radius:50%;
+  .burger-btn{
+    width:40px; height:40px; min-width:40px; border-radius:12px;
     background:var(--card2); border:1px solid var(--border);
-    font-size:17px; display:flex; align-items:center; justify-content:center;
-    color:var(--text); line-height:1;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
-  .icon-btn:active{ opacity:.7; }
+  .burger-btn:active{ opacity:.7; }
+  .burger-btn span, .burger-btn span::before, .burger-btn span::after{
+    content:''; display:block; width:18px; height:2px; background:var(--text); border-radius:2px;
+  }
+  .burger-btn span{ position:relative; }
+  .burger-btn span::before{ position:absolute; left:0; top:-6px; }
+  .burger-btn span::after{ position:absolute; left:0; top:6px; }
   main{padding:0 16px; max-width:520px; margin:0 auto;}
+
+  .drawer-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.5);
+    z-index:250; display:flex;
+  }
+  .drawer{
+    width:78%; max-width:320px; background:var(--card);
+    border-right:1px solid var(--border); border-radius:0 20px 20px 0;
+    padding:calc(26px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    display:flex; flex-direction:column;
+    box-shadow:12px 0 40px rgba(0,0,0,.35);
+    animation:drawerIn .18s ease;
+  }
+  @keyframes drawerIn{ from{ transform:translateX(-100%); } to{ transform:translateX(0); } }
+  .drawer-title{ font-size:20px; font-weight:800; margin:0 0 2px 6px; }
+  .drawer-who{ font-size:12.5px; color:var(--muted); margin:0 0 20px 6px; overflow-wrap:anywhere; }
+  .drawer-item{
+    display:flex; align-items:center; gap:14px; width:100%;
+    padding:14px 12px; border-radius:13px; border:none; background:none;
+    font-size:16px; font-weight:600; color:var(--text); cursor:pointer; text-align:left;
+  }
+  .drawer-item:active{ background:var(--card2); }
+  .drawer-item .mi{ width:26px; text-align:center; font-size:19px; }
+  .drawer-foot{ margin-top:auto; padding-top:16px; }
+  .drawer-item.signout{ font-size:15px; font-weight:600; color:var(--muted); border:1px solid var(--border); }
 
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(0,0,0,.5);
@@ -365,14 +394,10 @@
 <div id="budgetScreen" style="display:none;">
 <header>
   <div class="header-row">
-    <div>
+    <button class="burger-btn" id="menuBtn" type="button" aria-label="Menu"><span></span></button>
+    <div style="flex:1; min-width:0;">
       <h1>💰 <span id="budgetTitle">Daily Budget</span></h1>
       <div class="sub" id="datesub">—</div>
-    </div>
-    <div class="header-icons">
-      <button class="icon-btn" id="homeIconBtn" type="button" aria-label="My budgets">🏠</button>
-      <button class="icon-btn" id="statsIconBtn" type="button" aria-label="Budget history">📊</button>
-      <button class="icon-btn" id="peopleIconBtn" type="button" aria-label="Share & members">👥</button>
     </div>
   </div>
 </header>
@@ -438,6 +463,19 @@
 </div><!-- /budgetScreen -->
 
 <div class="toast" id="toast"></div>
+
+<div class="drawer-backdrop" id="drawerBackdrop" style="display:none;">
+  <nav class="drawer" id="drawer">
+    <div class="drawer-title">💰 <span id="drawerTitle">Daily Budget</span></div>
+    <div class="drawer-who" id="drawerWho"></div>
+    <button class="drawer-item" id="menuBudgets" type="button"><span class="mi">🏠</span> My budgets</button>
+    <button class="drawer-item" id="menuHistory" type="button"><span class="mi">📊</span> Budget history</button>
+    <button class="drawer-item" id="menuShare" type="button"><span class="mi">👥</span> Share &amp; members</button>
+    <div class="drawer-foot">
+      <button class="drawer-item signout" id="menuSignOut" type="button"><span class="mi">⎋</span> Sign out</button>
+    </div>
+  </nav>
+</div>
 
 <div class="modal-backdrop" id="shareModalBackdrop" style="display:none;">
   <div class="modal-sheet">
@@ -541,6 +579,7 @@ let selectedCurrency = 'UAH';
 let usdRate = null; // 1 USD = X UAH
 let eurRate = null; // 1 EUR = X UAH
 let paidExpanded = false;
+let selectedStatIndex = null;
 
 function save(){
   if(remoteReady && canEdit() && budgetRef){
@@ -1138,47 +1177,51 @@ function recordHistoryPoint(){
   save();
 }
 
+function legendHtml(b){
+  const dateLabel = b.date.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+  return `<strong>${dateLabel}</strong> — Daily budget: ₴${fmt(b.v)}`;
+}
+
 function renderStatsChart(){
   const container = $('#statsChart');
   const now = new Date();
   const lastSalary = lastSalaryDate(now);
   const nextSalary = nextSalaryDate(now);
-  const dayMs = 24*60*60*1000;
-  const totalDays = Math.max(Math.round((nextSalary.getTime() - lastSalary.getTime()) / dayMs), 1);
 
-  const slots = [];
-  for(let i=0; i<totalDays; i++){
-    slots.push({ date: new Date(lastSalary.getTime() + i*dayMs), value: null, t: null });
-  }
+  // One bar per calendar day that HAS data (latest value that day), within the current cycle.
+  const byDay = new Map();
   (state.history || []).forEach(pt => {
     if(pt.t < lastSalary.getTime() || pt.t >= nextSalary.getTime()) return;
-    const idx = Math.floor((pt.t - lastSalary.getTime()) / dayMs);
-    if(idx < 0 || idx >= slots.length) return;
-    if(slots[idx].t === null || pt.t > slots[idx].t){
-      slots[idx].value = pt.v;
-      slots[idx].t = pt.t;
+    const d = new Date(pt.t);
+    const key = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+    const prev = byDay.get(key);
+    if(!prev || pt.t > prev.t){
+      byDay.set(key, { t: pt.t, v: pt.v, date: new Date(d.getFullYear(), d.getMonth(), d.getDate()) });
     }
   });
+  const bars = [...byDay.values()].sort((a,b) => a.date - b.date);
 
-  const dataSlots = slots.filter(s => s.value !== null);
-  if(dataSlots.length === 0){
+  if(bars.length === 0){
     container.innerHTML = '<div class="empty">No data yet since last salary — update "What\'s left on card" to start tracking</div>';
     return;
   }
+  if(selectedStatIndex !== null && selectedStatIndex >= bars.length) selectedStatIndex = null;
 
-  const values = dataSlots.map(s => s.value);
+  const values = bars.map(b => b.v);
   let maxV = Math.max(...values, 0);
   let minV = Math.min(...values, 0);
   if(maxV === minV){ maxV += 1; minV -= 1; }
   const range = maxV - minV;
 
   const w = 700, h = 320;
-  const padL = 60, padR = 10, padT = 14, padB = 34;
+  const padL = 60, padR = 12, padT = 16, padB = 34;
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
   const zeroY = padT + (maxV / range) * plotH;
-  const slotW = plotW / totalDays;
-  const barW = Math.max(slotW * 0.6, 2);
+  const n = bars.length;
+  const slotW = plotW / n;                     // width per bar shrinks as bars grow
+  const gap = Math.min(slotW * 0.18, 16);      // proportional gap between bars, capped
+  const barW = Math.max(slotW - gap, 6);       // wide bars that fill the chart
 
   const tickCount = 4;
   let yAxisHtml = '';
@@ -1189,25 +1232,29 @@ function renderStatsChart(){
     yAxisHtml += `<text x="${padL-8}" y="${y+4}" text-anchor="end" style="font-size:11px; fill:var(--muted);">₴${fmt(v)}</text>`;
   }
 
-  const labelEvery = Math.max(Math.ceil(totalDays/6), 1);
+  const labelEvery = n <= 8 ? 1 : Math.ceil(n/8);
   let xAxisHtml = '';
-  slots.forEach((s,i) => {
-    if(i % labelEvery !== 0 && i !== totalDays-1) return;
+  bars.forEach((b,i) => {
+    if(i % labelEvery !== 0 && i !== n-1) return;
     const x = padL + i*slotW + slotW/2;
-    xAxisHtml += `<text x="${x}" y="${h-padB+16}" text-anchor="middle" style="font-size:10px; fill:var(--muted);">${s.date.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</text>`;
+    xAxisHtml += `<text x="${x}" y="${h-padB+16}" text-anchor="middle" style="font-size:10px; fill:var(--muted);">${b.date.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</text>`;
   });
 
-  let barsHtml = '';
-  let hitHtml = '';
-  slots.forEach((s,i) => {
+  let barsHtml = '', ringHtml = '', hitHtml = '';
+  bars.forEach((b,i) => {
     const x = padL + i*slotW;
-    hitHtml += `<rect data-i="${i}" x="${x}" y="${padT}" width="${slotW}" height="${plotH}" fill="transparent" style="cursor:pointer;"/>`;
-    if(s.value === null) return;
-    const barH = Math.max(Math.abs(s.value)/range * plotH, 1);
-    const barY = s.value >= 0 ? zeroY - barH : zeroY;
-    const color = s.value >= 0 ? 'var(--accent)' : 'var(--danger)';
     const barX = x + (slotW - barW)/2;
-    barsHtml += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="2" style="fill:${color}; pointer-events:none;"/>`;
+    const barH = Math.max(Math.abs(b.v)/range * plotH, 2);
+    const barY = b.v >= 0 ? zeroY - barH : zeroY;
+    const selected = i === selectedStatIndex;
+    const color = b.v >= 0
+      ? (selected ? '#1f9d46' : 'var(--accent)')
+      : (selected ? '#c8352c' : 'var(--danger)');
+    barsHtml += `<rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="3" style="fill:${color}; pointer-events:none;"/>`;
+    if(selected){
+      ringHtml += `<rect x="${barX-3}" y="${barY-3}" width="${barW+6}" height="${barH+6}" rx="6" style="fill:none; stroke:var(--accent2); stroke-width:2.5; pointer-events:none;"/>`;
+    }
+    hitHtml += `<rect data-i="${i}" x="${x}" y="${padT}" width="${slotW}" height="${plotH}" fill="transparent" style="cursor:pointer;"/>`;
   });
 
   container.innerHTML = `
@@ -1215,24 +1262,19 @@ function renderStatsChart(){
       ${yAxisHtml}
       <line x1="${padL}" y1="${zeroY}" x2="${w-padR}" y2="${zeroY}" style="stroke:var(--muted); stroke-width:1"/>
       ${barsHtml}
+      ${ringHtml}
       ${xAxisHtml}
       ${hitHtml}
     </svg>
-    <div class="rate-note">${lastSalary.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} – ${nextSalary.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} · ${dataSlots.length}/${totalDays} day${totalDays===1?'':'s'} tracked</div>
-    <div id="chartLegend" class="chart-legend" style="display:none;"></div>
+    <div id="chartLegend" class="chart-legend" style="display:${selectedStatIndex!==null ? 'block':'none'};">${selectedStatIndex!==null ? legendHtml(bars[selectedStatIndex]) : ''}</div>
+    <div class="rate-note">${lastSalary.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} – ${nextSalary.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} · ${n} day${n===1?'':'s'} tracked · tap a bar for details</div>
   `;
 
   $('#statsSvg').addEventListener('click', e => {
     const rect = e.target.closest('rect[data-i]');
     if(!rect) return;
-    const idx = Number(rect.dataset.i);
-    const s = slots[idx];
-    const legend = $('#chartLegend');
-    legend.style.display = 'block';
-    const dateLabel = s.date.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
-    legend.innerHTML = s.value === null
-      ? `<strong>${dateLabel}</strong> — no data recorded`
-      : `<strong>${dateLabel}</strong> — Daily budget: ₴${fmt(s.value)}`;
+    selectedStatIndex = Number(rect.dataset.i);
+    renderStatsChart();
   });
 }
 
@@ -1375,10 +1417,6 @@ $('#createBudgetBtn').addEventListener('click', createBudget);
 $('#joinBudgetBtn').addEventListener('click', () => { showScreen('joinScreen'); renderMyBudgets(); });
 $('#landingSignOutBtn').addEventListener('click', doSignOut);
 $('#backToLandingBtn').addEventListener('click', showLanding);
-$('#homeIconBtn').addEventListener('click', () => {
-  if($('#shareModalBackdrop').style.display === 'flex') closeModal($('#shareModalBackdrop'));
-  goHome();
-});
 
 $('#myBudgetsList').addEventListener('click', e => {
   const item = e.target.closest('.budget-item');
@@ -1391,16 +1429,26 @@ $('#myBudgetsList').addEventListener('click', e => {
 function openModal(el){ el.style.display = 'flex'; }
 function closeModal(el){ el.style.display = 'none'; }
 
-$('#peopleIconBtn').addEventListener('click', () => openModal($('#shareModalBackdrop')));
+// ---------- Sidebar drawer ----------
+function openDrawer(){
+  $('#drawerTitle').textContent = budgetName || 'Daily Budget';
+  $('#drawerWho').textContent = currentUser ? currentUser.email : '';
+  $('#drawerBackdrop').style.display = 'flex';
+}
+function closeDrawer(){ $('#drawerBackdrop').style.display = 'none'; }
+
+$('#menuBtn').addEventListener('click', openDrawer);
+$('#drawerBackdrop').addEventListener('click', e => { if(e.target === $('#drawerBackdrop')) closeDrawer(); });
+$('#menuBudgets').addEventListener('click', () => { closeDrawer(); goHome(); });
+$('#menuHistory').addEventListener('click', () => { closeDrawer(); selectedStatIndex = null; renderStatsChart(); openModal($('#statsModalBackdrop')); });
+$('#menuShare').addEventListener('click', () => { closeDrawer(); openModal($('#shareModalBackdrop')); });
+$('#menuSignOut').addEventListener('click', () => { closeDrawer(); doSignOut(); });
+
 $('#shareModalClose').addEventListener('click', () => closeModal($('#shareModalBackdrop')));
 $('#shareModalBackdrop').addEventListener('click', e => {
   if(e.target === $('#shareModalBackdrop')) closeModal($('#shareModalBackdrop'));
 });
 
-$('#statsIconBtn').addEventListener('click', () => {
-  renderStatsChart();
-  openModal($('#statsModalBackdrop'));
-});
 $('#statsModalClose').addEventListener('click', () => closeModal($('#statsModalBackdrop')));
 $('#statsModalBackdrop').addEventListener('click', e => {
   if(e.target === $('#statsModalBackdrop')) closeModal($('#statsModalBackdrop'));
