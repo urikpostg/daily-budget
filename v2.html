@@ -160,6 +160,15 @@
   }
   .field{flex:1; min-width:0;}
 
+  .checkline{
+    display:flex; align-items:center; gap:9px; margin:12px 0 0;
+    font-size:14px; color:var(--text); cursor:pointer; user-select:none;
+  }
+  .checkline input[type=checkbox]{
+    width:20px; height:20px; min-width:20px; margin:0; cursor:pointer;
+    accent-color:var(--accent2);
+  }
+
   .seg{
     display:flex;
     background:var(--card2);
@@ -383,6 +392,10 @@
       </div>
       <div style="color:var(--muted); font-weight:600;">UAH</div>
     </div>
+    <label class="checkline" for="excludeToday">
+      <input type="checkbox" id="excludeToday">
+      <span>Exclude today from the daily budget</span>
+    </label>
   </div>
 
   <div class="card">
@@ -523,7 +536,7 @@ function isOwner(){ return !!(currentUser && ownerUid && currentUser.uid === own
 function isMember(){ return !!(currentUser && members.includes(currentUser.uid)); }
 function canEdit(){ return isOwner() || isMember(); }
 
-let state = { leftover: 0, payments: [], lastResetMonth: null, history: [] };
+let state = { leftover: 0, payments: [], lastResetMonth: null, history: [], excludeToday: false };
 let selectedCurrency = 'UAH';
 let usdRate = null; // 1 USD = X UAH
 let eurRate = null; // 1 EUR = X UAH
@@ -535,7 +548,8 @@ function save(){
       leftover: state.leftover,
       payments: state.payments,
       history: state.history,
-      lastResetMonth: state.lastResetMonth
+      lastResetMonth: state.lastResetMonth,
+      excludeToday: !!state.excludeToday
     }, { merge: true }).catch(() => setSyncNote('Sync failed — check your connection'));
   }
 }
@@ -719,7 +733,8 @@ function applyRemoteDoc(data){
     leftover: data.leftover || 0,
     payments: data.payments || [],
     lastResetMonth: data.lastResetMonth || null,
-    history: data.history || []
+    history: data.history || [],
+    excludeToday: !!data.excludeToday
   };
   $('#budgetTitle').textContent = budgetName;
 }
@@ -823,6 +838,7 @@ function applyAccessUI(){
   const editAllowed = canEdit();
   document.body.classList.toggle('readonly', !editAllowed);
   $('#leftover').readOnly = !editAllowed;
+  $('#excludeToday').disabled = !editAllowed;
   $('#pName').disabled = !editAllowed;
   $('#pAmount').disabled = !editAllowed;
   $('#pDay').disabled = !editAllowed;
@@ -979,10 +995,17 @@ function recalcAll(){
   render();
 }
 
-function currentDaySubtitle(){
+// Days the budget is spread over. "Exclude today" drops the current day from the divisor.
+function budgetDays(){
   const now = new Date();
   const salary = nextSalaryDate(now);
-  const days = Math.max(daysBetween(now, salary), 1);
+  let days = daysBetween(now, salary);
+  if(state.excludeToday) days -= 1;
+  return { salary, days: Math.max(days, 1) };
+}
+
+function currentDaySubtitle(){
+  const { salary, days } = budgetDays();
   $('#datesub').textContent = `Next salary: ${salary.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} · ${days} day${days===1?'':'s'} left`;
   return { salary, days };
 }
@@ -1008,6 +1031,7 @@ function render(){
   if(document.activeElement !== $('#leftover')){
     $('#leftover').value = state.leftover ? String(state.leftover) : '';
   }
+  $('#excludeToday').checked = !!state.excludeToday;
 
   const list = $('#paymentsList');
   if(state.payments.length === 0){
@@ -1101,8 +1125,7 @@ function isStandalone(){
 }
 
 function recordHistoryPoint(){
-  const salary = nextSalaryDate(new Date());
-  const days = Math.max(daysBetween(new Date(), salary), 1);
+  const { days } = budgetDays();
   const unpaidTotal = state.payments
     .filter(p => !p.paid)
     .reduce((sum,p) => sum + (Number(p.amountUAH)||0), 0);
@@ -1247,6 +1270,14 @@ $('#leftover').addEventListener('input', e => {
 
 $('#leftover').addEventListener('change', () => {
   if(!canEdit()) return;
+  recordHistoryPoint();
+});
+
+$('#excludeToday').addEventListener('change', e => {
+  if(!canEdit()){ e.target.checked = !!state.excludeToday; return; }
+  state.excludeToday = e.target.checked;
+  save();
+  render();
   recordHistoryPoint();
 });
 
