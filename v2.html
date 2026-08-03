@@ -6,8 +6,13 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
-<link rel="icon" href="apple-touch-icon.png?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+<link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167x167.png?v=2">
+<link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152x152.png?v=2">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2">
+<link rel="icon" href="favicon.ico?v=2" sizes="any">
 <title>Daily Budget</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
@@ -107,7 +112,8 @@
     font-size:16px; font-weight:600; color:var(--text); cursor:pointer; text-align:left;
   }
   .drawer-item:active{ background:var(--card2); }
-  .drawer-item .mi{ width:26px; text-align:center; font-size:19px; }
+  .drawer-item .mi{ width:24px; height:24px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; }
+  .drawer-item .mi svg{ width:21px; height:21px; display:block; }
   .drawer-foot{ margin-top:auto; padding-top:16px; }
   .drawer-item.signout{ font-size:15px; font-weight:600; color:var(--muted); border:1px solid var(--border); }
 
@@ -493,12 +499,12 @@
   <nav class="drawer" id="drawer">
     <div class="drawer-title"><span id="drawerTitle">Daily Budget</span></div>
     <div class="drawer-who" id="drawerWho"></div>
-    <button class="drawer-item" id="menuAddPayment" type="button"><span class="mi">➕</span> Add payment</button>
-    <button class="drawer-item" id="menuBudgets" type="button"><span class="mi">🏠</span> My budgets</button>
-    <button class="drawer-item" id="menuHistory" type="button"><span class="mi">📊</span> Budget history</button>
-    <button class="drawer-item" id="menuShare" type="button"><span class="mi">👥</span> Share &amp; members</button>
+    <button class="drawer-item" id="menuAddPayment" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span> Add payment</button>
+    <button class="drawer-item" id="menuBudgets" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7"/><path d="M6 9.6V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.6"/></svg></span> My budgets</button>
+    <button class="drawer-item" id="menuHistory" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"/><line x1="7" y1="20" x2="7" y2="13"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="17" y1="20" x2="17" y2="11"/></svg></span> Budget history</button>
+    <button class="drawer-item" id="menuShare" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.1"/><path d="M3.6 19a5.4 5.4 0 0 1 10.8 0"/><path d="M16 5.2a3 3 0 0 1 0 5.8"/><path d="M17.5 13.2a5.2 5.2 0 0 1 2.9 5"/></svg></span> Share &amp; members</button>
     <div class="drawer-foot">
-      <button class="drawer-item signout" id="menuSignOut" type="button"><span class="mi">⎋</span> Sign out</button>
+      <button class="drawer-item signout" id="menuSignOut" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M14 12h7"/><path d="m18 9 3 3-3 3"/></svg></span> Sign out</button>
     </div>
   </nav>
 </div>
