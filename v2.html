@@ -6,8 +6,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+<link rel="icon" href="apple-touch-icon.png?v=2">
 <title>Daily Budget</title>
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
@@ -374,6 +374,10 @@
     padding:24px calc(24px + env(safe-area-inset-left)) 24px calc(24px + env(safe-area-inset-right));
   }
   .centerbox{ width:100%; max-width:420px; }
+  .app-logo{
+    width:84px; height:84px; border-radius:19px; display:block;
+    margin:0 auto 16px; box-shadow:0 8px 24px rgba(0,0,0,.28);
+  }
   .muted{ color:var(--muted); text-align:center; font-size:14px; margin:8px 0 24px; }
   .budget-item{
     display:flex; align-items:center; gap:12px;
@@ -413,7 +417,8 @@
 <!-- SIGN-IN GATE -->
 <div id="signInScreen" class="screen" style="display:none;">
   <div class="centerbox" style="text-align:center;">
-    <h1 style="font-size:26px;">💰 Daily Budget</h1>
+    <img src="apple-touch-icon.png?v=2" alt="" class="app-logo">
+    <h1 style="font-size:26px;">Daily Budget</h1>
     <p class="muted">Sign in to create your budget or open one shared with you.</p>
     <div id="gsiButtonContainer" style="display:flex; justify-content:center; margin-top:8px; min-height:44px;"></div>
     <div class="rate-note" id="gateNote"></div>
@@ -423,7 +428,8 @@
 <!-- LANDING: create / join -->
 <div id="landingScreen" class="screen" style="display:none;">
   <div class="centerbox" style="text-align:center;">
-    <h1 style="font-size:26px;">💰 Daily Budget</h1>
+    <img src="apple-touch-icon.png?v=2" alt="" class="app-logo">
+    <h1 style="font-size:26px;">Daily Budget</h1>
     <p class="muted" id="landingWho"></p>
     <button class="btn" id="createBudgetBtn">➕ Create new budget</button>
     <button class="btn secondary" id="joinBudgetBtn">📂 Open existing budget</button>
