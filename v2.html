@@ -21,6 +21,9 @@
     --accent2:#0a84ff;
     --danger:#ff453a;
     --border:#2a2e34;
+    /* motion */
+    --ease-out:cubic-bezier(.22,.61,.36,1);
+    --dur:.26s;
   }
   @media (prefers-color-scheme: light){
     :root{
@@ -66,6 +69,13 @@
     display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
   .burger-btn:active{ opacity:.7; }
+  .edit-name-btn{
+    display:none; align-items:center; justify-content:center; vertical-align:middle;
+    width:26px; height:26px; min-width:26px; margin-left:6px; padding:0;
+    border-radius:8px; border:1px solid var(--border); background:var(--card2);
+    color:var(--muted); font-size:13px; cursor:pointer;
+  }
+  .edit-name-btn:active{ opacity:.7; }
   .burger-btn span, .burger-btn span::before, .burger-btn span::after{
     content:''; display:block; width:18px; height:2px; background:var(--text); border-radius:2px;
   }
@@ -76,17 +86,19 @@
 
   .drawer-backdrop{
     position:fixed; inset:0; background:rgba(0,0,0,.5);
-    z-index:250; display:flex;
+    z-index:190; display:flex;
+    opacity:0; transition:opacity var(--dur) ease;
   }
+  .drawer-backdrop.show{ opacity:1; }
   .drawer{
     width:78%; max-width:320px; background:var(--card);
     border-right:1px solid var(--border); border-radius:0 20px 20px 0;
     padding:calc(26px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
     display:flex; flex-direction:column;
     box-shadow:12px 0 40px rgba(0,0,0,.35);
-    animation:drawerIn .18s ease;
+    transform:translateX(-100%); transition:transform var(--dur) var(--ease-out);
   }
-  @keyframes drawerIn{ from{ transform:translateX(-100%); } to{ transform:translateX(0); } }
+  .drawer-backdrop.show .drawer{ transform:translateX(0); }
   .drawer-title{ font-size:20px; font-weight:800; margin:0 0 2px 6px; }
   .drawer-who{ font-size:12.5px; color:var(--muted); margin:0 0 20px 6px; overflow-wrap:anywhere; }
   .drawer-item{
@@ -103,14 +115,21 @@
     position:fixed; inset:0; background:rgba(0,0,0,.5);
     display:flex; align-items:flex-end; justify-content:center;
     z-index:200;
+    --sheet-from:translateY(100%); --sheet-from-op:1;
+    opacity:0; transition:opacity var(--dur) ease;
   }
+  .modal-backdrop.show{ opacity:1; }
+  .modal-backdrop.center{ --sheet-from:scale(.92); --sheet-from-op:0; }
   .modal-sheet{
     background:var(--card);
     width:100%; max-width:520px;
     border-radius:20px 20px 0 0;
     padding:18px 16px calc(18px + env(safe-area-inset-bottom));
     max-height:85vh; overflow-y:auto;
+    transform:var(--sheet-from); opacity:var(--sheet-from-op);
+    transition:transform var(--dur) var(--ease-out), opacity var(--dur) ease;
   }
+  .modal-backdrop.show .modal-sheet{ transform:none; opacity:1; }
   .modal-header{
     display:flex; align-items:center; justify-content:space-between;
     margin-bottom:14px;
@@ -172,6 +191,25 @@
   }
   .card-toggle h2{ margin:0; }
   .chevron{ color:var(--muted); font-size:13px; }
+
+  /* Collapsible (Paid payments) — smooth height via grid-template-rows */
+  .paid-toggle{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; background:var(--card2); color:var(--text); border:1px solid var(--border);
+    border-radius:12px; padding:11px; font-size:15px; font-weight:600; cursor:pointer; margin-top:10px;
+  }
+  .paid-toggle:active{ opacity:.8; }
+  .paid-toggle .chev{ color:var(--muted); font-size:12px; transition:transform var(--dur) var(--ease-out); }
+  .paid-toggle.open .chev{ transform:rotate(180deg); }
+  /* max-height is driven in JS (measured scrollHeight) so it's content-agnostic */
+  .collapse{ max-height:0; overflow:hidden; transition:max-height var(--dur) var(--ease-out); }
+  .collapse .pad{ padding-top:10px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .drawer, .modal-sheet, .drawer-backdrop, .modal-backdrop,
+    .collapse, .paid-toggle .chev, .check{ transition-duration:.001s !important; }
+    .check.checking, .check.unchecking{ animation-duration:.001s !important; }
+  }
 
   label{font-size:13px; color:var(--muted); display:block; margin-bottom:4px;}
   input[type=text], input[type=number], input[type=date]{
@@ -262,14 +300,21 @@
     font-size:15px;
     color:transparent;
     cursor:pointer;
-    transition:background .12s, border-color .12s;
+    transition:background .18s var(--ease-out), border-color .18s var(--ease-out);
   }
-  .check:hover{ border-color:var(--accent); background:rgba(52,199,89,.12); }
+  /* Only real pointers get hover — stops the sticky green flash on the next row after a tap. */
+  @media (hover:hover){
+    .check:hover{ border-color:var(--accent); background:rgba(52,199,89,.12); }
+  }
   .payment.paid .check{
     background:var(--accent);
     border-color:var(--accent);
     color:#fff;
   }
+  /* Tap feedback: fill + pop before the row moves to Paid. */
+  @keyframes checkPop{ 0%{transform:scale(1);} 45%{transform:scale(1.22);} 100%{transform:scale(1);} }
+  .check.checking, .check.unchecking{ animation:checkPop .34s var(--ease-out); }
+  .check.checking{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .payment.paid .check::after{ content:''; }
   .payment .info{flex:1 1 auto; min-width:0; cursor:pointer;}
   .payment .name{font-weight:600; font-size:15px; overflow-wrap:anywhere;}
@@ -353,7 +398,7 @@
     }
     #unpaidGrid .payment, #paidGrid .payment{ margin-bottom:0; height:100%; }
 
-    .modal-backdrop{ align-items:center; padding:20px; }
+    .modal-backdrop{ align-items:center; padding:20px; --sheet-from:scale(.92); --sheet-from-op:0; }
     .modal-sheet{ border-radius:20px; max-width:520px; max-height:80vh; }
   }
 </style>
@@ -396,7 +441,7 @@
   <div class="header-row">
     <button class="burger-btn" id="menuBtn" type="button" aria-label="Menu"><span></span></button>
     <div style="flex:1; min-width:0;">
-      <h1>💰 <span id="budgetTitle">Daily Budget</span></h1>
+      <h1>💰 <span id="budgetTitle">Daily Budget</span><button class="edit-name-btn" id="editNameBtn" type="button" aria-label="Rename budget" title="Rename budget">✎</button></h1>
       <div class="sub" id="datesub">—</div>
     </div>
   </div>
@@ -494,15 +539,8 @@
     <button class="btn" id="shareBtn">Share link</button>
 
     <div id="ownerPanel" style="display:none; margin-top:18px;">
-      <label>Budget name</label>
-      <div class="row">
-        <div class="field"><input type="text" id="budgetNameInput" placeholder="My budget"></div>
-        <button class="btn secondary" id="renameBtn" style="margin-top:0; width:auto; padding:10px 14px;">Save</button>
-      </div>
-      <div style="margin-top:14px;">
-        <label>Members</label>
-        <div id="membersList"></div>
-      </div>
+      <label>Members</label>
+      <div id="membersList"></div>
     </div>
 
     <button class="btn secondary" id="leaveBudgetBtn" style="margin-top:18px;">Remove from my budgets</button>
@@ -521,7 +559,22 @@
   </div>
 </div>
 
-<div class="modal-backdrop" id="confirmBackdrop" style="display:none; z-index:300; align-items:center;">
+<div class="modal-backdrop center" id="renameBackdrop" style="display:none; z-index:300; align-items:center;">
+  <div class="modal-sheet" style="border-radius:16px; max-width:380px; margin:0 16px;">
+    <div class="modal-header">
+      <h2>Rename budget</h2>
+      <button class="modal-close" id="renameClose" type="button">✕</button>
+    </div>
+    <label for="renameInput">Budget name</label>
+    <input type="text" id="renameInput" placeholder="My budget" maxlength="40" autocomplete="off">
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn secondary" id="renameCancel" style="margin-top:0;">Cancel</button>
+      <button class="btn" id="renameSave" style="margin-top:0;">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop center" id="confirmBackdrop" style="display:none; z-index:300; align-items:center;">
   <div class="modal-sheet" style="border-radius:16px; max-width:380px; margin:0 16px;">
     <div id="confirmMsg" style="font-size:15px; line-height:1.4; margin-bottom:16px;"></div>
     <div style="display:flex; gap:10px;">
@@ -832,13 +885,21 @@ async function openBudget(id){
 
 async function renameBudget(){
   if(!isOwner()) return;
-  const name = $('#budgetNameInput').value.trim();
-  if(!name){ showToast('Enter a budget name'); $('#budgetNameInput').focus(); return; }
+  const name = $('#renameInput').value.trim();
+  if(!name){ showToast('Enter a budget name'); $('#renameInput').focus(); return; }
   try{
     await setDoc(budgetRef, { name }, { merge: true });
     budgetName = name; $('#budgetTitle').textContent = name;
     showToast('Renamed');
+    closeModal($('#renameBackdrop'));
   }catch(e){ showToast('Could not rename'); }
+}
+
+function openRename(){
+  if(!isOwner()) return;
+  $('#renameInput').value = budgetName === 'Daily Budget' ? '' : (budgetName || '');
+  openModal($('#renameBackdrop'));
+  setTimeout(() => $('#renameInput').focus(), 60);
 }
 
 async function leaveBudget(){
@@ -889,9 +950,9 @@ function applyAccessUI(){
 
   const ownerPanel = $('#ownerPanel');
   const accessNote = $('#accessNote');
+  $('#editNameBtn').style.display = isOwner() ? 'inline-flex' : 'none';
   if(isOwner()){
     ownerPanel.style.display = 'block';
-    if(document.activeElement !== $('#budgetNameInput')) $('#budgetNameInput').value = budgetName;
     renderMembers();
     accessNote.textContent = 'You own this budget';
   } else {
@@ -1087,17 +1148,33 @@ function render(){
       ? `<div id="unpaidGrid">${unpaid.map(rowHtml).join('')}</div>`
       : '<div class="empty">All payments marked as paid</div>';
     if(paid.length){
-      html += `<button class="btn secondary" id="paidToggle" type="button">${paidExpanded ? '▴' : '▾'} Paid (${paid.length})</button>`;
-      html += `<div id="paidGrid" style="margin-top:10px; ${paidExpanded ? '' : 'display:none;'}">${paid.map(rowHtml).join('')}</div>`;
+      html += `<button class="paid-toggle ${paidExpanded ? 'open' : ''}" id="paidToggle" type="button"><span class="chev">▾</span><span class="lbl">${paidExpanded ? 'Hide paid' : 'Paid'} (${paid.length})</span></button>`;
+      html += `<div class="collapse" id="paidCollapse"><div id="paidGrid" class="pad">${paid.map(rowHtml).join('')}</div></div>`;
     }
     list.innerHTML = html;
+
+    // If we re-render while expanded (e.g. after adding/marking a payment), keep it open.
+    const collEl = $('#paidCollapse');
+    if(collEl && paidExpanded) collEl.style.maxHeight = 'none';
 
     const paidToggleBtn = $('#paidToggle');
     if(paidToggleBtn){
       paidToggleBtn.addEventListener('click', e => {
         e.stopPropagation();
+        // Animate open/closed without a full re-render, measuring height so it works for any content.
         paidExpanded = !paidExpanded;
-        render();
+        const coll = $('#paidCollapse');
+        paidToggleBtn.classList.toggle('open', paidExpanded);
+        const count = state.payments.filter(p => p.paid).length;
+        paidToggleBtn.querySelector('.lbl').textContent = `${paidExpanded ? 'Hide paid' : 'Paid'} (${count})`;
+        if(paidExpanded){
+          coll.style.maxHeight = coll.scrollHeight + 'px';
+          const onEnd = () => { coll.style.maxHeight = 'none'; coll.removeEventListener('transitionend', onEnd); };
+          coll.addEventListener('transitionend', onEnd);
+        } else {
+          coll.style.maxHeight = coll.scrollHeight + 'px';      // pin current height first…
+          requestAnimationFrame(() => requestAnimationFrame(() => { coll.style.maxHeight = '0'; })); // …then collapse
+        }
       });
     }
   }
@@ -1140,9 +1217,9 @@ function askConfirm(message){
   return new Promise(resolve => {
     const backdrop = $('#confirmBackdrop');
     $('#confirmMsg').textContent = message;
-    backdrop.style.display = 'flex';
+    showOverlay(backdrop);
     const cleanup = (result) => {
-      backdrop.style.display = 'none';
+      hideOverlay(backdrop);
       okBtn.removeEventListener('click', onOk);
       cancelBtn.removeEventListener('click', onCancel);
       backdrop.removeEventListener('click', onBackdrop);
@@ -1373,9 +1450,21 @@ $('#paymentsList').addEventListener('click', async e => {
   const action = e.target.closest('[data-action]')?.dataset.action;
   if(action === 'toggle'){
     const p = state.payments.find(p => p.id === id);
-    if(p) p.paid = !p.paid;
-    save();
-    render();
+    if(!p) return;
+    // Show the check fill + pop first, so there's a beat of feedback before the row moves.
+    const checkEl = e.target.closest('.check');
+    const goingPaid = !p.paid;
+    if(checkEl){
+      checkEl.classList.add(goingPaid ? 'checking' : 'unchecking');
+      if(goingPaid) checkEl.textContent = '✓';
+    }
+    row.style.pointerEvents = 'none';   // block a second tap during the animation
+    const delay = reduceMotion ? 0 : (goingPaid ? 380 : 240);
+    setTimeout(() => {
+      p.paid = !p.paid;
+      save();
+      render();
+    }, delay);
   } else if(action === 'delete'){
     if(await askConfirm('Delete this payment?')){
       state.payments = state.payments.filter(p => p.id !== id);
@@ -1403,7 +1492,12 @@ $('#shareBtn').addEventListener('click', async () => {
   }
 });
 
-$('#renameBtn').addEventListener('click', renameBudget);
+$('#editNameBtn').addEventListener('click', openRename);
+$('#renameSave').addEventListener('click', renameBudget);
+$('#renameCancel').addEventListener('click', () => closeModal($('#renameBackdrop')));
+$('#renameClose').addEventListener('click', () => closeModal($('#renameBackdrop')));
+$('#renameBackdrop').addEventListener('click', e => { if(e.target === $('#renameBackdrop')) closeModal($('#renameBackdrop')); });
+$('#renameInput').addEventListener('keydown', e => { if(e.key === 'Enter') renameBudget(); });
 $('#leaveBudgetBtn').addEventListener('click', leaveBudget);
 
 $('#membersList').addEventListener('click', e => {
@@ -1426,16 +1520,30 @@ $('#myBudgetsList').addEventListener('click', e => {
   else { goToBudget(item.dataset.id); }
 });
 
-function openModal(el){ el.style.display = 'flex'; }
-function closeModal(el){ el.style.display = 'none'; }
+// Animated overlay show/hide — fade the backdrop + slide/scale the panel, then unmount.
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_DUR = reduceMotion ? 10 : 300;
+function showOverlay(el){
+  clearTimeout(el._hideT);
+  el.style.display = 'flex';
+  void el.offsetWidth;              // force reflow so the transition runs from the hidden state
+  el.classList.add('show');
+}
+function hideOverlay(el){
+  el.classList.remove('show');
+  clearTimeout(el._hideT);
+  el._hideT = setTimeout(() => { el.style.display = 'none'; }, OVERLAY_DUR);
+}
+function openModal(el){ showOverlay(el); }
+function closeModal(el){ hideOverlay(el); }
 
 // ---------- Sidebar drawer ----------
 function openDrawer(){
   $('#drawerTitle').textContent = budgetName || 'Daily Budget';
   $('#drawerWho').textContent = currentUser ? currentUser.email : '';
-  $('#drawerBackdrop').style.display = 'flex';
+  showOverlay($('#drawerBackdrop'));
 }
-function closeDrawer(){ $('#drawerBackdrop').style.display = 'none'; }
+function closeDrawer(){ hideOverlay($('#drawerBackdrop')); }
 
 $('#menuBtn').addEventListener('click', openDrawer);
 $('#drawerBackdrop').addEventListener('click', e => { if(e.target === $('#drawerBackdrop')) closeDrawer(); });
