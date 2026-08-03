@@ -411,6 +411,42 @@
   .budget-item .chev{ color:var(--muted); }
   .budget-item .del{ font-size:18px; }
 
+  /* ---- Phase 1: categories, savings, settings, one-offs ---- */
+  .cat-chip{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; white-space:nowrap; vertical-align:middle; }
+  .cat-chip .cdot{ width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+  .cat-pick{ display:flex; flex-wrap:wrap; gap:7px; }
+  .cat-pick .cat-chip{ cursor:pointer; border:1px solid transparent; padding:5px 10px; background:var(--card2); color:var(--muted); }
+  .cat-pick .cat-chip.sel{ border-color:currentColor; }
+  .cat-pick .cat-chip .cdot{ width:8px; height:8px; }
+
+  .savings-main{ display:flex; align-items:center; gap:12px; }
+  .savings-ic{ width:40px; height:40px; min-width:40px; border-radius:11px; background:var(--card2); border:1px solid var(--border); color:var(--text); display:flex; align-items:center; justify-content:center; }
+  .savings-ic svg{ width:22px; height:22px; }
+  .savings-amt{ font-size:24px; font-weight:800; color:var(--text); letter-spacing:-.01em; line-height:1.05; }
+  .savings-sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .two-btn{ display:flex; gap:10px; margin-top:12px; }
+  .two-btn .btn{ margin-top:0; }
+
+  .toggle-sw{ width:44px; height:26px; min-width:44px; border-radius:20px; background:var(--border); position:relative; cursor:pointer; transition:background .18s; border:none; padding:0; flex:0 0 auto; }
+  .toggle-sw.on{ background:var(--accent); }
+  .toggle-sw::after{ content:''; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; transition:left .18s; box-shadow:0 1px 3px rgba(0,0,0,.3); }
+  .toggle-sw.on::after{ left:20px; }
+  .set-row{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
+  .set-row:last-child{ border-bottom:none; }
+  .set-row .st{ flex:1; min-width:0; } .set-row .st .t{ font-size:14px; font-weight:600; } .set-row .st .d{ font-size:12px; color:var(--muted); margin-top:2px; }
+
+  .seg2{ display:flex; background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:2px; margin-bottom:12px; }
+  .seg2 button{ flex:1; border:none; background:transparent; color:var(--muted); padding:9px 0; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+  .seg2 button.active{ background:var(--accent2); color:#fff; }
+  .segc{ display:flex; background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:2px; }
+  .segc button{ flex:1; border:none; background:transparent; color:var(--muted); padding:8px 0; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+  .segc button.active{ background:var(--accent2); color:#fff; }
+
+  .payment.past{ opacity:.7; }
+  .prompt-ic{ width:52px; height:52px; margin:2px auto 6px; border-radius:15px; background:var(--card2); border:1px solid var(--border); color:var(--text); display:flex; align-items:center; justify-content:center; }
+  .prompt-ic svg{ width:28px; height:28px; }
+  .btn.ghost{ background:transparent; color:var(--muted); border:1px solid var(--border); }
+
   /* ---- Responsive breakpoints ---- */
   /* Default styles above are mobile (portrait phones). */
 
@@ -420,11 +456,11 @@
     .hero{ padding:28px 36px; }
     .hero .amount{ font-size:56px; }
 
-    #unpaidGrid, #paidGrid{
+    #unpaidGrid, #paidGrid, #oneoffGrid{
       display:grid; grid-template-columns:repeat(2, 1fr); gap:12px 14px;
       align-items:stretch;
     }
-    #unpaidGrid .payment, #paidGrid .payment{ margin-bottom:0; height:100%; }
+    #unpaidGrid .payment, #paidGrid .payment, #oneoffGrid .payment{ margin-bottom:0; height:100%; }
 
     .modal-backdrop{ align-items:center; padding:20px; --sheet-from:scale(.92); --sheet-from-op:0; }
     .modal-sheet{ border-radius:20px; max-width:520px; max-height:80vh; }
@@ -510,9 +546,29 @@
     </label>
   </div>
 
+  <div class="card" id="savingsCard">
+    <h2>Savings</h2>
+    <div class="savings-main">
+      <div class="savings-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3V6"/><path d="M4.5 12c0 1.66 3.36 3 7.5 3s7.5-1.34 7.5-3"/></svg></div>
+      <div style="flex:1; min-width:0;">
+        <div class="savings-amt" id="savingsAmt">$0.00</div>
+        <div class="savings-sub" id="savingsSub">—</div>
+      </div>
+    </div>
+    <div class="two-btn">
+      <button class="btn secondary" id="savingsAddBtn">Add</button>
+      <button class="btn secondary" id="savingsEditBtn">Edit</button>
+    </div>
+  </div>
+
   <div class="card">
     <h2>Regular payments</h2>
     <div id="paymentsList"><div class="empty">No payments yet</div></div>
+  </div>
+
+  <div class="card">
+    <h2>One-off expenses</h2>
+    <div id="oneoffList"><div class="empty">No one-off expenses</div></div>
   </div>
 </main>
 </div><!-- /budgetScreen -->
@@ -523,9 +579,10 @@
   <nav class="drawer" id="drawer">
     <div class="drawer-title"><span id="drawerTitle">Daily Budget</span></div>
     <div class="drawer-who" id="drawerWho"></div>
-    <button class="drawer-item" id="menuAddPayment" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span> Add payment</button>
+    <button class="drawer-item" id="menuAddPayment" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span> Add expense</button>
     <button class="drawer-item" id="menuBudgets" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7"/><path d="M6 9.6V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.6"/></svg></span> My budgets</button>
     <button class="drawer-item" id="menuHistory" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"/><line x1="7" y1="20" x2="7" y2="13"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="17" y1="20" x2="17" y2="11"/></svg></span> Budget history</button>
+    <button class="drawer-item" id="menuSettings" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.6 1.6 0 0 0 .32 1.77l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.6 1.6 0 0 0-1.77-.32 1.6 1.6 0 0 0-.97 1.47V21a2 2 0 0 1-4 0v-.09a1.6 1.6 0 0 0-1.05-1.47 1.6 1.6 0 0 0-1.77.32l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.6 1.6 0 0 0 .32-1.77 1.6 1.6 0 0 0-1.47-.97H3a2 2 0 0 1 0-4h.09a1.6 1.6 0 0 0 1.47-1.05 1.6 1.6 0 0 0-.32-1.77l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.6 1.6 0 0 0 1.77.32H9a1.6 1.6 0 0 0 .97-1.47V3a2 2 0 0 1 4 0v.09a1.6 1.6 0 0 0 .97 1.47 1.6 1.6 0 0 0 1.77-.32l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.6 1.6 0 0 0-.32 1.77V9a1.6 1.6 0 0 0 1.47.97H21a2 2 0 0 1 0 4h-.09a1.6 1.6 0 0 0-1.47.97Z"/></svg></span> Settings</button>
     <button class="drawer-item" id="menuShare" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.1"/><path d="M3.6 19a5.4 5.4 0 0 1 10.8 0"/><path d="M16 5.2a3 3 0 0 1 0 5.8"/><path d="M17.5 13.2a5.2 5.2 0 0 1 2.9 5"/></svg></span> Share &amp; members</button>
     <div class="drawer-foot">
       <button class="drawer-item signout" id="menuSignOut" type="button"><span class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M14 12h7"/><path d="m18 9 3 3-3 3"/></svg></span> Sign out</button>
@@ -573,13 +630,23 @@
 <div class="modal-backdrop" id="addPaymentBackdrop" style="display:none;">
   <div class="modal-sheet">
     <div class="modal-header">
-      <h2>Add regular payment</h2>
+      <h2>Add expense</h2>
       <button class="modal-close" id="addPaymentClose" type="button">✕</button>
+    </div>
+    <div class="seg2" id="kindSeg">
+      <button type="button" data-k="regular" class="active">Regular</button>
+      <button type="button" data-k="oneoff">One-off</button>
     </div>
     <div class="row">
       <div class="field">
         <label>Name</label>
         <input type="text" id="pName" placeholder="e.g. Rent">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Category</label>
+        <div class="cat-pick" id="catPick"></div>
       </div>
     </div>
     <div class="row">
@@ -596,17 +663,23 @@
         <input type="number" inputmode="decimal" id="pAmount" placeholder="0" step="0.01">
       </div>
     </div>
-    <div class="row">
+    <div class="row" id="regWhen">
       <div class="field">
         <label>Days after salary</label>
         <input type="number" inputmode="numeric" id="pDay" placeholder="e.g. 5" min="0" max="31">
+      </div>
+    </div>
+    <div class="row" id="oneWhen" style="display:none;">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="pDate">
       </div>
     </div>
     <label class="checkline" for="addAnother" style="margin-top:14px;">
       <input type="checkbox" id="addAnother">
       <span>Add another one after saving</span>
     </label>
-    <button class="btn" id="addBtn">Add payment</button>
+    <button class="btn" id="addBtn">Add expense</button>
     <div class="rate-note" id="rateNote">Rate: —</div>
   </div>
 </div>
@@ -633,6 +706,105 @@
       <button class="btn secondary" id="confirmCancel" style="margin-top:0;">Cancel</button>
       <button class="btn" id="confirmOk" style="margin-top:0;">OK</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-backdrop center" id="promptBackdrop" style="display:none; z-index:320; align-items:center;">
+  <div class="modal-sheet" style="border-radius:16px; max-width:360px; margin:0 16px;">
+    <div id="promptMsg" style="font-size:15px; font-weight:600; margin-bottom:10px;"></div>
+    <input type="text" id="promptInput" maxlength="40" autocomplete="off">
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button class="btn secondary" id="promptCancel" style="margin-top:0;">Cancel</button>
+      <button class="btn" id="promptOk" style="margin-top:0;">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="settingsBackdrop" style="display:none;">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>Settings</h2>
+      <button class="modal-close" id="settingsClose" type="button">✕</button>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <h2>Salary</h2>
+      <label for="setSalaryDay">Pay day (day of month)</label>
+      <input type="number" id="setSalaryDay" inputmode="numeric" min="1" max="31" placeholder="15">
+      <label style="margin-top:12px;">Salary amount</label>
+      <div class="row">
+        <div style="flex:0 0 132px;">
+          <div class="segc" id="setSalaryCurr">
+            <button type="button" data-c="UAH" class="active">₴</button>
+            <button type="button" data-c="USD">$</button>
+            <button type="button" data-c="EUR">€</button>
+          </div>
+        </div>
+        <div class="field"><input type="number" id="setSalaryAmount" inputmode="decimal" placeholder="0" step="0.01"></div>
+      </div>
+      <div class="rate-note" style="text-align:left; margin-top:8px;">On pay day the app asks whether to add this to “what's left”, converting to ₴ at that day's rate. Weekend pay days shift to Fri/Mon.</div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <h2>Notifications</h2>
+      <div class="set-row">
+        <div class="st"><div class="t">Payment overdue</div><div class="d">1 day after a due payment is still unchecked</div></div>
+        <button type="button" class="toggle-sw" id="setNotifyOverdue" aria-label="Toggle overdue reminders"></button>
+      </div>
+      <div class="set-row">
+        <div class="st"><div class="t">Salary day</div><div class="d">Reminder to update your balance</div></div>
+        <button type="button" class="toggle-sw" id="setNotifySalary" aria-label="Toggle salary reminders"></button>
+      </div>
+      <div class="rate-note" style="text-align:left; margin-top:6px;">Push delivery is coming soon — this saves your preference for now.</div>
+    </div>
+
+    <div class="card">
+      <h2>Categories</h2>
+      <div class="cat-pick" id="catManage" style="margin-bottom:10px;"></div>
+      <div class="row">
+        <div class="field"><input type="text" id="newCatName" placeholder="New category name" maxlength="24"></div>
+        <button class="btn secondary" id="addCatBtn" style="margin-top:0; width:auto; padding:10px 14px;">Add</button>
+      </div>
+    </div>
+
+    <button class="btn" id="settingsSave">Save settings</button>
+  </div>
+</div>
+
+<div class="modal-backdrop center" id="savingsAddBackdrop" style="display:none; z-index:300; align-items:center;">
+  <div class="modal-sheet" style="border-radius:16px; max-width:380px; margin:0 16px;">
+    <div class="modal-header"><h2>Add to savings</h2><button class="modal-close" id="savingsAddClose" type="button">✕</button></div>
+    <div class="row">
+      <div style="flex:0 0 96px;">
+        <div class="segc" id="savCurr"><button type="button" data-c="UAH" class="active">₴</button><button type="button" data-c="USD">$</button></div>
+      </div>
+      <div class="field"><input type="number" id="savAddAmount" inputmode="decimal" placeholder="Amount" step="0.01"></div>
+    </div>
+    <button class="btn" id="savingsAddConfirm" style="margin-top:12px;">Add to savings</button>
+    <div class="rate-note" style="text-align:left; margin-top:8px;">Deducts the UAH amount from “what's left” and lowers your daily budget. A ₴ amount is converted to USD at today's rate.</div>
+  </div>
+</div>
+
+<div class="modal-backdrop center" id="savingsEditBackdrop" style="display:none; z-index:300; align-items:center;">
+  <div class="modal-sheet" style="border-radius:16px; max-width:380px; margin:0 16px;">
+    <div class="modal-header"><h2>Edit savings total</h2><button class="modal-close" id="savingsEditClose" type="button">✕</button></div>
+    <label for="savEditAmount">Savings amount (USD)</label>
+    <input type="number" id="savEditAmount" inputmode="decimal" placeholder="0" step="0.01">
+    <div class="rate-note" style="text-align:left; margin-top:8px;">Restates the number only — does not change “what's left” or your daily budget.</div>
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button class="btn secondary" id="savingsEditCancel" style="margin-top:0;">Cancel</button>
+      <button class="btn" id="savingsEditConfirm" style="margin-top:0;">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop center" id="salaryPromptBackdrop" style="display:none; z-index:300; align-items:center;">
+  <div class="modal-sheet" style="border-radius:16px; max-width:360px; margin:0 16px; text-align:center;">
+    <div class="prompt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5"/><line x1="8" y1="3" x2="8" y2="6"/><line x1="16" y1="3" x2="16" y2="6"/></svg></div>
+    <div style="font-size:17px; font-weight:800; margin:2px 0 4px;">It's pay day</div>
+    <div id="salaryPromptMsg" style="font-size:13px; color:var(--muted); line-height:1.5;"></div>
+    <button class="btn" id="salaryPromptAdd">Add to balance</button>
+    <button class="btn ghost" id="salaryPromptDismiss" style="margin-top:8px;">Not now</button>
   </div>
 </div>
 
@@ -679,8 +851,35 @@ function isOwner(){ return !!(currentUser && ownerUid && currentUser.uid === own
 function isMember(){ return !!(currentUser && members.includes(currentUser.uid)); }
 function canEdit(){ return isOwner() || isMember(); }
 
-let state = { leftover: 0, payments: [], lastResetMonth: null, history: [], excludeToday: false };
+const DEFAULT_SETTINGS = { salaryDay: 15, salaryAmount: 0, salaryCurrency: 'UAH', notifyOverdue: false, notifySalary: false };
+const DEFAULT_CATEGORIES = [
+  { id:'housing', name:'Housing', color:'#0a84ff' },
+  { id:'utilities', name:'Utilities', color:'#22b39a' },
+  { id:'food', name:'Food', color:'#e58a12' },
+  { id:'subscriptions', name:'Subscriptions', color:'#a457d6' },
+  { id:'transport', name:'Transport', color:'#34c759' },
+  { id:'health', name:'Health', color:'#ff453a' },
+  { id:'other', name:'Other', color:'#8b929c' }
+];
+const CAT_PALETTE = ['#ff9f0a','#5e5ce6','#ff375f','#30d158','#64d2ff','#bf5af2','#ac8e68','#ff6482'];
+
+let state = {
+  leftover: 0, payments: [], oneoffs: [], lastResetMonth: null, history: [], excludeToday: false,
+  savingsUSD: 0, categories: [], settings: { ...DEFAULT_SETTINGS }, salaryAddedCycle: null
+};
 let selectedCurrency = 'UAH';
+let addKind = 'regular';     // 'regular' | 'oneoff' — add-expense modal mode
+let addCategory = null;      // selected category id in the add-expense picker
+let savAddCurrency = 'UAH';  // Add-to-savings currency
+let setSalaryCurrency = 'UAH';
+
+function allCategories(){ return [...DEFAULT_CATEGORIES, ...(state.categories || [])]; }
+function categoryById(id){ return allCategories().find(c => c.id === id) || null; }
+function rgba(hex, a){ const n = parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+function catChipHtml(catId){
+  const c = categoryById(catId); if(!c) return '';
+  return `<span class="cat-chip" style="color:${c.color}; background:${rgba(c.color,0.15)};"><span class="cdot" style="background:${c.color};"></span>${escapeHtml(c.name)}</span>`;
+}
 let usdRate = null; // 1 USD = X UAH
 let eurRate = null; // 1 EUR = X UAH
 let paidExpanded = false;
@@ -692,9 +891,14 @@ function save(){
     setDoc(budgetRef, {
       leftover: state.leftover,
       payments: state.payments,
+      oneoffs: state.oneoffs,
       history: state.history,
       lastResetMonth: state.lastResetMonth,
-      excludeToday: !!state.excludeToday
+      excludeToday: !!state.excludeToday,
+      savingsUSD: Number(state.savingsUSD) || 0,
+      categories: state.categories || [],
+      settings: state.settings || { ...DEFAULT_SETTINGS },
+      salaryAddedCycle: state.salaryAddedCycle || null
     }, { merge: true }).catch(() => setSyncNote('Sync failed — check your connection'));
   }
 }
@@ -808,7 +1012,8 @@ async function createBudget(){
       name: 'My budget',
       members: [currentUser.uid],
       memberEmails: { [currentUser.uid]: currentUser.email },
-      leftover: 0, payments: [], history: [], lastResetMonth: null
+      leftover: 0, payments: [], oneoffs: [], history: [], lastResetMonth: null,
+      savingsUSD: 0, categories: [], settings: { ...DEFAULT_SETTINGS }, salaryAddedCycle: null
     });
     await setDoc(userRef(), { budgetIds: arrayUnion(id) }, { merge: true });
     goToBudget(id);
@@ -877,9 +1082,14 @@ function applyRemoteDoc(data){
   state = {
     leftover: data.leftover || 0,
     payments: data.payments || [],
+    oneoffs: data.oneoffs || [],
     lastResetMonth: data.lastResetMonth || null,
     history: data.history || [],
-    excludeToday: !!data.excludeToday
+    excludeToday: !!data.excludeToday,
+    savingsUSD: Number(data.savingsUSD) || 0,
+    categories: data.categories || [],
+    settings: Object.assign({ ...DEFAULT_SETTINGS }, data.settings || {}),
+    salaryAddedCycle: data.salaryAddedCycle || null
   };
   $('#budgetTitle').textContent = budgetName;
 }
@@ -923,6 +1133,7 @@ async function openBudget(id){
   render();
   applyAccessUI();
   setSyncNote(syncError || 'Synced ✓');
+  if(!syncError) maybeShowSalaryPrompt();
 
   if(unsubscribe){ unsubscribe(); }
   unsubscribe = onSnapshot(budgetRef, s => {
@@ -998,6 +1209,9 @@ function applyAccessUI(){
   $('#addBtn').disabled = !editAllowed;
   $('#currSeg').querySelectorAll('button').forEach(b => b.disabled = !editAllowed);
   $('#menuAddPayment').style.display = editAllowed ? 'flex' : 'none';
+  $('#menuSettings').style.display = editAllowed ? 'flex' : 'none';
+  $('#savingsAddBtn').disabled = !editAllowed;
+  $('#savingsEditBtn').disabled = !editAllowed;
 
   $('#budgetTitle').textContent = budgetName || 'Daily Budget';
   updateShareLink();
@@ -1034,9 +1248,11 @@ function isWeekend(d){
 }
 
 function salaryDateFor(year, month){
-  let d = new Date(year, month, 15);
-  if(d.getDay() === 6) d.setDate(14);
-  else if(d.getDay() === 0) d.setDate(16);
+  const salaryDay = (state.settings && Number(state.settings.salaryDay)) || 15;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const d = new Date(year, month, Math.min(Math.max(salaryDay, 1), daysInMonth));
+  if(d.getDay() === 6) d.setDate(d.getDate() - 1);        // Saturday → Friday
+  else if(d.getDay() === 0) d.setDate(d.getDate() + 1);   // Sunday → Monday
   return d;
 }
 
@@ -1094,6 +1310,16 @@ function maybeResetMonthlyPaid(){
 
 let rateLoading = false;
 
+async function fetchFromErApi(){
+  const res = await fetch('https://open.er-api.com/v6/latest/USD');
+  const data = await res.json();
+  if(!(data && data.rates && data.rates.UAH)) return null;
+  return { usdRate: data.rates.UAH, eurRate: data.rates.EUR ? (data.rates.UAH / data.rates.EUR) : null, source: 'er-api' };
+}
+
+// NOTE: PrivatBank's public rate API sends no CORS headers, so it can't be called from a static
+// page. Rates come from the market source below; true PrivatBank rates arrive in Phase 2, fetched
+// server-side by the Cloud Function (no CORS there).
 async function fetchRate(manual){
   const cached = JSON.parse(localStorage.getItem(RATE_KEY) || 'null');
   const now = Date.now();
@@ -1102,21 +1328,21 @@ async function fetchRate(manual){
     eurRate = cached.eurRate;
     updateRateNote(cached, false);
   }
-  if(manual){ rateLoading = true; $('#rateNote').textContent = 'Refreshing rate…'; }
-  try{
-    const res = await fetch('https://open.er-api.com/v6/latest/USD');
-    const data = await res.json();
-    if(data && data.rates && data.rates.UAH){
-      usdRate = data.rates.UAH;
-      eurRate = data.rates.EUR ? (data.rates.UAH / data.rates.EUR) : null;
-      const payload = { usdRate, eurRate, ts: now };
-      localStorage.setItem(RATE_KEY, JSON.stringify(payload));
-      rateLoading = false;
-      updateRateNote(payload, true);
-      recalcAll();
-      if(manual) showToast('Rate updated');
-    }
-  }catch(e){
+  if(manual){ rateLoading = true; const el = $('#rateNote'); if(el) el.textContent = 'Refreshing rate…'; }
+
+  let got = null;
+  try{ got = await fetchFromErApi(); }catch(e){}
+
+  if(got && got.usdRate){
+    usdRate = got.usdRate;
+    eurRate = got.eurRate;
+    const payload = { usdRate, eurRate, ts: now, source: got.source };
+    localStorage.setItem(RATE_KEY, JSON.stringify(payload));
+    rateLoading = false;
+    updateRateNote(payload, true);
+    recalcAll();
+    if(manual) showToast('Rate updated');
+  } else {
     rateLoading = false;
     if(manual){ showToast('Could not refresh — check connection'); }
     updateRateNote(cached && cached.usdRate ? cached : null, false);
@@ -1125,26 +1351,27 @@ async function fetchRate(manual){
 
 function updateRateNote(rates, fresh){
   const el = $('#rateNote');
+  if(!el) return;
   if(rateLoading){ el.textContent = 'Refreshing rate…'; return; }
   if(!rates || !rates.usdRate){
     el.textContent = 'Rate unavailable — enter UAH amount directly';
     return;
   }
   const eurPart = rates.eurRate ? `, €1≈${fmt(rates.eurRate)}₴` : '';
-  el.innerHTML = `Rate: $1≈${fmt(rates.usdRate)}₴${eurPart} ${fresh ? '(live)' : '(cached)'} <button id="refreshRate" type="button">refresh</button>`;
-  $('#refreshRate').onclick = () => { if(!rateLoading) fetchRate(true); };
+  const src = rates.source === 'PrivatBank' ? 'PrivatBank' : (fresh ? 'live' : 'cached');
+  el.innerHTML = `Rate: $1≈${fmt(rates.usdRate)}₴${eurPart} (${src}) <button id="refreshRate" type="button">refresh</button>`;
+  const rb = $('#refreshRate'); if(rb) rb.onclick = () => { if(!rateLoading) fetchRate(true); };
 }
 
 function recalcAll(){
-  // recompute UAH for foreign-currency payments using latest rates
+  // recompute UAH for foreign-currency payments + one-offs using latest rates
   if(!usdRate && !eurRate) return;
-  state.payments.forEach(p => {
-    if(p.currency === 'USD' && usdRate){
-      p.amountUAH = p.amountUSD * usdRate;
-    } else if(p.currency === 'EUR' && eurRate){
-      p.amountUAH = p.amountEUR * eurRate;
-    }
-  });
+  const reprice = p => {
+    if(p.currency === 'USD' && usdRate) p.amountUAH = p.amountUSD * usdRate;
+    else if(p.currency === 'EUR' && eurRate) p.amountUAH = p.amountEUR * eurRate;
+  };
+  state.payments.forEach(reprice);
+  (state.oneoffs || []).forEach(reprice);
   save();
   render();
 }
@@ -1185,22 +1412,26 @@ function render(){
   const unpaidTotal = state.payments
     .filter(p => !p.paid)
     .reduce((sum,p) => sum + (Number(p.amountUAH)||0), 0);
+  const oneoffTotal = unpaidOneoffTotal();
 
   const leftover = Number(state.leftover) || 0;
-  const remaining = leftover - unpaidTotal;
+  const remaining = leftover - unpaidTotal - oneoffTotal;
   const daily = remaining / days;
+  const oneoffDetail = oneoffTotal > 0 ? ` − ₴${fmt(oneoffTotal)} one-offs` : '';
 
   const dailyEl = $('#amtDaily');
   dailyEl.textContent = `₴${fmt(daily)}`;
   dailyEl.className = 'amount ' + (daily < 0 ? 'negative' : 'positive');
-  $('#detailDaily').textContent = `(₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid) ÷ ${days} day${days===1?'':'s'}`;
+  $('#detailDaily').textContent = `(₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} payments${oneoffDetail}) ÷ ${days} day${days===1?'':'s'}`;
 
   const remainEl = $('#amtRemain');
   remainEl.textContent = `₴${fmt(remaining)}`;
   remainEl.className = 'amount ' + (remaining < 0 ? 'negative' : 'positive');
-  $('#detailRemain').textContent = `₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid`;
+  $('#detailRemain').textContent = `₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} payments${oneoffDetail}`;
 
   updateHeroPosition();
+  renderSavingsCard();
+  renderOneoffList();
 
   // Don't clobber the field while the user is actively typing in it.
   if(document.activeElement !== $('#leftover')){
@@ -1254,12 +1485,13 @@ function paymentRowHtml(p, lastSalary){
   const dueDate = paymentDueDate(p, lastSalary);
   const dueLabel = dueDate.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
   const offset = Number(p.day) || 0;
+  const chip = p.category ? catChipHtml(p.category) + ' ' : '';
   return `
   <div class="payment ${p.paid?'paid':''}" data-id="${escapeHtml(p.id)}">
     <div class="check" data-action="toggle">${p.paid?'✓':''}</div>
     <div class="info">
       <div class="name ${p.paid?'paid-strike':''}">${escapeHtml(p.name)}</div>
-      <div class="meta">${offset} day${offset===1?'':'s'} after salary · ${dueLabel}</div>
+      <div class="meta">${chip}${offset} day${offset===1?'':'s'} after salary · ${dueLabel}</div>
     </div>
     <div class="amt">
       <div class="uah">₴${fmt(p.amountUAH)}</div>
@@ -1267,6 +1499,227 @@ function paymentRowHtml(p, lastSalary){
     </div>
     <button class="del" data-action="delete">✕</button>
   </div>`;
+}
+
+// ---------- One-offs ----------
+function oneoffDueDate(o){
+  const parts = String(o.date || '').split('-').map(Number);
+  if(parts.length === 3 && !parts.some(isNaN)) return new Date(parts[0], parts[1]-1, parts[2]);
+  return new Date(o.date);
+}
+function todayMidnight(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+function oneoffCounts(o){
+  // Counts against the budget while unpaid and not past. Once the date passes we stop counting —
+  // by then it's assumed reflected in the card balance, so counting again would double-subtract.
+  if(o.paid) return false;
+  return oneoffDueDate(o).getTime() >= todayMidnight().getTime();
+}
+function unpaidOneoffTotal(){
+  return (state.oneoffs || []).filter(oneoffCounts).reduce((s,o) => s + (Number(o.amountUAH)||0), 0);
+}
+function oneoffRowHtml(o){
+  const usdLine = o.currency === 'USD' ? `<div class="usd">$${fmt(o.amountUSD)}</div>` : '';
+  const eurLine = o.currency === 'EUR' ? `<div class="usd">€${fmt(o.amountEUR)}</div>` : '';
+  const due = oneoffDueDate(o);
+  const dueLabel = due.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+  const past = !o.paid && due.getTime() < todayMidnight().getTime();
+  const chip = o.category ? catChipHtml(o.category) + ' ' : '';
+  const status = o.paid ? ' · paid' : (past ? ' · past' : '');
+  return `
+  <div class="payment ${o.paid?'paid':''} ${past?'past':''}" data-id="${escapeHtml(o.id)}">
+    <div class="check" data-action="toggle">${o.paid?'✓':''}</div>
+    <div class="info">
+      <div class="name ${o.paid?'paid-strike':''}">${escapeHtml(o.name)}</div>
+      <div class="meta">${chip}${dueLabel}${status}</div>
+    </div>
+    <div class="amt">
+      <div class="uah">₴${fmt(o.amountUAH)}</div>
+      ${usdLine}${eurLine}
+    </div>
+    <button class="del" data-action="delete">✕</button>
+  </div>`;
+}
+function renderOneoffList(){
+  const list = $('#oneoffList');
+  if(!list) return;
+  const items = state.oneoffs || [];
+  if(items.length === 0){ list.innerHTML = '<div class="empty">No one-off expenses</div>'; return; }
+  const sorted = [...items].sort((a,b) => oneoffDueDate(a) - oneoffDueDate(b));
+  list.innerHTML = `<div id="oneoffGrid">${sorted.map(oneoffRowHtml).join('')}</div>`;
+}
+
+// ---------- Savings (USD balance) ----------
+function renderSavingsCard(){
+  const usd = Number(state.savingsUSD) || 0;
+  const amtEl = $('#savingsAmt'), subEl = $('#savingsSub');
+  if(!amtEl) return;
+  amtEl.textContent = `$${fmt(usd)}`;
+  if(usd <= 0) subEl.textContent = 'Nothing saved yet';
+  else if(usdRate) subEl.textContent = `≈ ₴${fmt(usd * usdRate)} at today's rate`;
+  else subEl.textContent = 'USD savings';
+}
+function openSavingsAdd(){
+  if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
+  savAddCurrency = 'UAH';
+  $('#savCurr').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.c === 'UAH'));
+  $('#savAddAmount').value = '';
+  openModal($('#savingsAddBackdrop'));
+  setTimeout(() => $('#savAddAmount').focus(), 60);
+}
+function doSavingsAdd(){
+  if(!canEdit()) return;
+  const amount = parseFloat($('#savAddAmount').value);
+  if(!amount || amount <= 0){ showToast('Enter an amount'); return; }
+  if(!usdRate){ showToast('Rate not loaded yet, try again shortly'); return; }
+  let usdAdded, uahDeduct;
+  if(savAddCurrency === 'USD'){ usdAdded = amount; uahDeduct = amount * usdRate; }
+  else { uahDeduct = amount; usdAdded = amount / usdRate; }
+  state.savingsUSD = (Number(state.savingsUSD) || 0) + usdAdded;
+  state.leftover = (Number(state.leftover) || 0) - uahDeduct;   // real transfer out of spendable
+  save();
+  render();
+  recordHistoryPoint();
+  closeModal($('#savingsAddBackdrop'));
+  showToast(`Saved $${fmt(usdAdded)}`);
+}
+function openSavingsEdit(){
+  if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
+  const usd = Number(state.savingsUSD) || 0;
+  $('#savEditAmount').value = usd ? String(Math.round(usd*100)/100) : '';
+  openModal($('#savingsEditBackdrop'));
+  setTimeout(() => $('#savEditAmount').focus(), 60);
+}
+function doSavingsEdit(){
+  if(!canEdit()) return;
+  const v = parseFloat($('#savEditAmount').value);
+  if(isNaN(v) || v < 0){ showToast('Enter a valid amount'); return; }
+  state.savingsUSD = v;      // restate only — deliberately does NOT touch leftover / budget
+  save();
+  render();
+  closeModal($('#savingsEditBackdrop'));
+  showToast('Savings updated');
+}
+
+// ---------- Categories ----------
+function renderCatPick(){
+  const wrap = $('#catPick');
+  if(!wrap) return;
+  const chips = allCategories().map(c =>
+    `<span class="cat-chip ${addCategory === c.id ? 'sel' : ''}" data-cat="${escapeHtml(c.id)}" style="color:${c.color};"><span class="cdot" style="background:${c.color};"></span>${escapeHtml(c.name)}</span>`
+  ).join('');
+  wrap.innerHTML = chips + `<span class="cat-chip" data-cat="__new" style="color:var(--muted);"><span class="cdot" style="background:var(--muted);"></span>+ New</span>`;
+}
+function renderCatManage(){
+  const wrap = $('#catManage');
+  if(!wrap) return;
+  wrap.innerHTML = allCategories().map(c => {
+    const custom = (state.categories || []).some(x => x.id === c.id);
+    const rm = custom ? ` <span data-rm="${escapeHtml(c.id)}" style="cursor:pointer; margin-left:1px; opacity:.8;">✕</span>` : '';
+    return `<span class="cat-chip" style="color:${c.color}; background:${rgba(c.color,0.15)};"><span class="cdot" style="background:${c.color};"></span>${escapeHtml(c.name)}${rm}</span>`;
+  }).join('');
+}
+function createCategory(name){
+  name = (name || '').trim();
+  if(!name) return null;
+  const existing = allCategories().find(c => c.name.toLowerCase() === name.toLowerCase());
+  if(existing) return existing.id;
+  const id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+  const used = new Set(allCategories().map(c => c.color));
+  const color = CAT_PALETTE.find(col => !used.has(col)) || CAT_PALETTE[(state.categories || []).length % CAT_PALETTE.length];
+  state.categories = [...(state.categories || []), { id, name, color }];
+  save();
+  return id;
+}
+function removeCategory(id){
+  state.categories = (state.categories || []).filter(c => c.id !== id);
+  save();
+  renderCatManage();
+  render();
+}
+
+// ---------- Settings ----------
+function openSettings(){
+  if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
+  const s = state.settings || DEFAULT_SETTINGS;
+  $('#setSalaryDay').value = s.salaryDay || 15;
+  $('#setSalaryAmount').value = s.salaryAmount ? String(s.salaryAmount) : '';
+  setSalaryCurrency = s.salaryCurrency || 'UAH';
+  $('#setSalaryCurr').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.c === setSalaryCurrency));
+  $('#setNotifyOverdue').classList.toggle('on', !!s.notifyOverdue);
+  $('#setNotifySalary').classList.toggle('on', !!s.notifySalary);
+  $('#newCatName').value = '';
+  renderCatManage();
+  openModal($('#settingsBackdrop'));
+}
+function saveSettings(){
+  if(!canEdit()) return;
+  let day = parseInt($('#setSalaryDay').value, 10);
+  if(isNaN(day) || day < 1) day = 1;
+  if(day > 31) day = 31;
+  state.settings = {
+    salaryDay: day,
+    salaryAmount: parseFloat($('#setSalaryAmount').value) || 0,
+    salaryCurrency: setSalaryCurrency,
+    notifyOverdue: $('#setNotifyOverdue').classList.contains('on'),
+    notifySalary: $('#setNotifySalary').classList.contains('on')
+  };
+  save();
+  render();     // pay-day change can move dates
+  closeModal($('#settingsBackdrop'));
+  showToast('Settings saved');
+}
+
+// ---------- Pay-day prompt (in-app) ----------
+function cycleKey(d){ return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate(); }
+function maybeShowSalaryPrompt(){
+  if(!canEdit()) return;
+  const s = state.settings || {};
+  const amount = Number(s.salaryAmount) || 0;
+  if(amount <= 0) return;
+  const today = todayMidnight();
+  const lastSal = lastSalaryDate(today);
+  const key = cycleKey(lastSal);
+  if(state.salaryAddedCycle === key) return;          // already added this cycle
+  if(daysBetween(lastSal, today) > 5) return;         // only within 5 days of pay day
+  const cur = s.salaryCurrency || 'UAH';
+  let uah = amount, conv = '';
+  if(cur === 'USD'){ if(!usdRate) return; uah = amount * usdRate; conv = `$${fmt(amount)} ≈ `; }
+  else if(cur === 'EUR'){ if(!eurRate) return; uah = amount * eurRate; conv = `€${fmt(amount)} ≈ `; }
+  $('#salaryPromptMsg').innerHTML = `Add your salary to “what's left on card”?<br><b style="color:var(--text);">${conv}₴${fmt(uah)}</b>${cur !== 'UAH' ? ' at today\'s rate' : ''}`;
+  const addBtn = $('#salaryPromptAdd');
+  addBtn.textContent = `Add ₴${fmt(uah)} to balance`;
+  addBtn.dataset.uah = uah;
+  addBtn.dataset.key = key;
+  openModal($('#salaryPromptBackdrop'));
+}
+
+// Generic single-input prompt (used for "+ New" category).
+function askPrompt(message, initial){
+  return new Promise(resolve => {
+    const backdrop = $('#promptBackdrop');
+    $('#promptMsg').textContent = message;
+    const input = $('#promptInput');
+    input.value = initial || '';
+    showOverlay(backdrop);
+    setTimeout(() => input.focus(), 60);
+    const ok = $('#promptOk'), cancel = $('#promptCancel');
+    const cleanup = (val) => {
+      hideOverlay(backdrop);
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      backdrop.removeEventListener('click', onBackdrop);
+      input.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    const onOk = () => cleanup(input.value.trim());
+    const onCancel = () => cleanup(null);
+    const onBackdrop = (e) => { if(e.target === backdrop) cleanup(null); };
+    const onKey = (e) => { if(e.key === 'Enter') onOk(); };
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    backdrop.addEventListener('click', onBackdrop);
+    input.addEventListener('keydown', onKey);
+  });
 }
 
 function escapeHtml(s){
@@ -1314,7 +1767,7 @@ function recordHistoryPoint(){
     .filter(p => !p.paid)
     .reduce((sum,p) => sum + (Number(p.amountUAH)||0), 0);
   const leftover = Number(state.leftover) || 0;
-  const daily = (leftover - unpaidTotal) / days;
+  const daily = (leftover - unpaidTotal - unpaidOneoffTotal()) / days;
 
   state.history = state.history || [];
   state.history.push({ t: Date.now(), v: Math.round(daily*100)/100 });
@@ -1529,42 +1982,45 @@ $('#addBtn').addEventListener('click', () => {
   if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
   const name = $('#pName').value.trim();
   const amount = parseFloat($('#pAmount').value);
-  const day = parseInt($('#pDay').value, 10);
 
   if(!name){ showToast('Enter a name'); return; }
   if(!amount || amount <= 0){ showToast('Enter an amount'); return; }
-  if(isNaN(day) || day < 0 || day > 31){ showToast('Enter a valid number of days (0-31)'); return; }
 
   let amountUSD = null, amountEUR = null, amountUAH;
   if(selectedCurrency === 'USD'){
     if(!usdRate){ showToast('Rate not loaded yet, try again shortly'); return; }
-    amountUSD = amount;
-    amountUAH = amount * usdRate;
+    amountUSD = amount; amountUAH = amount * usdRate;
   } else if(selectedCurrency === 'EUR'){
     if(!eurRate){ showToast('Rate not loaded yet, try again shortly'); return; }
-    amountEUR = amount;
-    amountUAH = amount * eurRate;
+    amountEUR = amount; amountUAH = amount * eurRate;
   } else {
     amountUAH = amount;
   }
 
-  state.payments.push({
+  const base = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    name,
-    currency: selectedCurrency,
-    amountUSD,
-    amountEUR,
-    amountUAH,
-    day,
-    paid: false
-  });
+    name, currency: selectedCurrency, amountUSD, amountEUR, amountUAH,
+    category: addCategory || null, paid: false
+  };
+
+  if(addKind === 'oneoff'){
+    const dateVal = $('#pDate').value;
+    if(!dateVal){ showToast('Pick a date'); return; }
+    state.oneoffs = state.oneoffs || [];
+    state.oneoffs.push({ ...base, date: dateVal });
+  } else {
+    const day = parseInt($('#pDay').value, 10);
+    if(isNaN(day) || day < 0 || day > 31){ showToast('Enter a valid number of days (0-31)'); return; }
+    state.payments.push({ ...base, day });
+  }
+
   save();
   render();
 
   $('#pName').value = '';
   $('#pAmount').value = '';
   $('#pDay').value = '';
-  showToast('Payment added');
+  showToast(addKind === 'oneoff' ? 'One-off added' : 'Payment added');
 
   if($('#addAnother').checked){
     $('#pName').focus();                       // keep the modal open with a fresh blank form
@@ -1604,6 +2060,84 @@ $('#paymentsList').addEventListener('click', async e => {
     }
   }
 });
+
+$('#oneoffList').addEventListener('click', async e => {
+  if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
+  const row = e.target.closest('.payment'); if(!row) return;
+  const id = row.dataset.id;
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if(action === 'toggle'){
+    const o = (state.oneoffs || []).find(o => o.id === id); if(!o) return;
+    const checkEl = e.target.closest('.check');
+    const goingPaid = !o.paid;
+    if(checkEl){ checkEl.classList.add(goingPaid ? 'checking' : 'unchecking'); if(goingPaid) checkEl.textContent = '✓'; }
+    row.style.pointerEvents = 'none';
+    setTimeout(() => { o.paid = !o.paid; save(); render(); }, reduceMotion ? 0 : (goingPaid ? 380 : 240));
+  } else if(action === 'delete'){
+    if(await askConfirm('Delete this one-off expense?')){
+      state.oneoffs = (state.oneoffs || []).filter(o => o.id !== id);
+      save();
+      render();
+    }
+  }
+});
+
+// Savings
+$('#savingsAddBtn').addEventListener('click', openSavingsAdd);
+$('#savingsEditBtn').addEventListener('click', openSavingsEdit);
+$('#savingsAddClose').addEventListener('click', () => closeModal($('#savingsAddBackdrop')));
+$('#savingsAddBackdrop').addEventListener('click', e => { if(e.target === $('#savingsAddBackdrop')) closeModal($('#savingsAddBackdrop')); });
+$('#savingsAddConfirm').addEventListener('click', doSavingsAdd);
+$('#savingsEditClose').addEventListener('click', () => closeModal($('#savingsEditBackdrop')));
+$('#savingsEditCancel').addEventListener('click', () => closeModal($('#savingsEditBackdrop')));
+$('#savingsEditBackdrop').addEventListener('click', e => { if(e.target === $('#savingsEditBackdrop')) closeModal($('#savingsEditBackdrop')); });
+$('#savingsEditConfirm').addEventListener('click', doSavingsEdit);
+$('#savCurr').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  savAddCurrency = b.dataset.c;
+  [...$('#savCurr').children].forEach(x => x.classList.toggle('active', x === b));
+});
+
+// Settings
+$('#menuSettings').addEventListener('click', () => { closeDrawer(); openSettings(); });
+$('#settingsClose').addEventListener('click', () => closeModal($('#settingsBackdrop')));
+$('#settingsBackdrop').addEventListener('click', e => { if(e.target === $('#settingsBackdrop')) closeModal($('#settingsBackdrop')); });
+$('#settingsSave').addEventListener('click', saveSettings);
+$('#setSalaryCurr').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  setSalaryCurrency = b.dataset.c;
+  [...$('#setSalaryCurr').children].forEach(x => x.classList.toggle('active', x === b));
+});
+$('#setNotifyOverdue').addEventListener('click', () => $('#setNotifyOverdue').classList.toggle('on'));
+$('#setNotifySalary').addEventListener('click', () => $('#setNotifySalary').classList.toggle('on'));
+$('#addCatBtn').addEventListener('click', () => {
+  const name = $('#newCatName').value.trim();
+  if(!name){ showToast('Enter a category name'); return; }
+  createCategory(name);
+  $('#newCatName').value = '';
+  renderCatManage();
+});
+$('#catManage').addEventListener('click', async e => {
+  const rm = e.target.closest('[data-rm]'); if(!rm) return;
+  if(await askConfirm('Remove this category? Expenses using it will show no category.')){
+    removeCategory(rm.dataset.rm);
+  }
+});
+
+// Pay-day prompt
+$('#salaryPromptAdd').addEventListener('click', () => {
+  const uah = parseFloat($('#salaryPromptAdd').dataset.uah) || 0;
+  const key = $('#salaryPromptAdd').dataset.key;
+  state.leftover = (Number(state.leftover) || 0) + uah;
+  state.salaryAddedCycle = key;
+  save();
+  render();
+  recordHistoryPoint();
+  closeModal($('#salaryPromptBackdrop'));
+  showToast('Salary added');
+});
+$('#salaryPromptDismiss').addEventListener('click', () => closeModal($('#salaryPromptBackdrop')));
+$('#salaryPromptBackdrop').addEventListener('click', e => { if(e.target === $('#salaryPromptBackdrop')) closeModal($('#salaryPromptBackdrop')); });
 
 $('#shareBtn').addEventListener('click', async () => {
   const link = $('#shareLink').value;
@@ -1694,14 +2228,44 @@ $('#statsModalBackdrop').addEventListener('click', e => {
   if(e.target === $('#statsModalBackdrop')) closeModal($('#statsModalBackdrop'));
 });
 
+function setAddKind(k){
+  addKind = k;
+  $('#kindSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.k === k));
+  $('#regWhen').style.display = k === 'oneoff' ? 'none' : '';
+  $('#oneWhen').style.display = k === 'oneoff' ? '' : 'none';
+}
 function openAddPayment(){
   if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
+  setAddKind('regular');
+  addCategory = null;
+  renderCatPick();
+  selectedCurrency = 'UAH';
+  $('#currSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.c === 'UAH'));
+  $('#amtLabel').textContent = 'Amount (UAH)';
+  $('#pName').value = ''; $('#pAmount').value = ''; $('#pDay').value = '';
+  if($('#pDate')) $('#pDate').value = new Date().toISOString().slice(0,10);
+  $('#addAnother').checked = false;
   openModal($('#addPaymentBackdrop'));
   setTimeout(() => $('#pName').focus(), 60);
 }
 $('#addPaymentClose').addEventListener('click', () => closeModal($('#addPaymentBackdrop')));
 $('#addPaymentBackdrop').addEventListener('click', e => {
   if(e.target === $('#addPaymentBackdrop')) closeModal($('#addPaymentBackdrop'));
+});
+$('#kindSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  setAddKind(b.dataset.k);
+});
+$('#catPick').addEventListener('click', async e => {
+  const chip = e.target.closest('[data-cat]'); if(!chip) return;
+  const id = chip.dataset.cat;
+  if(id === '__new'){
+    const name = await askPrompt('New category name');
+    if(name){ addCategory = createCategory(name); renderCatPick(); }
+    return;
+  }
+  addCategory = (addCategory === id) ? null : id;   // toggle selection
+  renderCatPick();
 });
 
 window.addEventListener('popstate', () => route());
