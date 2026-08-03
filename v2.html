@@ -151,7 +151,12 @@
     padding:22px 20px;
     margin-bottom:16px;
     text-align:center;
+    cursor:pointer;
   }
+  .hero:active{ opacity:.9; }
+  .hero-dots{ display:flex; gap:6px; justify-content:center; margin-top:12px; }
+  .hero-dots .dot{ width:6px; height:6px; border-radius:50%; background:var(--border); transition:background .2s; }
+  .hero-dots .dot.active{ background:var(--muted); }
   .hero .label{color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.04em;}
   .hero .amount{
     font-size:clamp(26px, 9vw, 48px);
@@ -448,10 +453,11 @@
 </header>
 
 <main>
-  <div class="hero">
-    <div class="label">Daily budget</div>
+  <div class="hero" id="heroCard" role="button" tabindex="0" title="Tap to switch view">
+    <div class="label" id="heroLabel">Daily budget</div>
     <div class="amount" id="dailyAmount">₴0</div>
     <div class="detail" id="heroDetail">—</div>
+    <div class="hero-dots" id="heroDots"><span class="dot active"></span><span class="dot"></span></div>
   </div>
 
   <div class="card">
@@ -472,38 +478,6 @@
     <h2>Regular payments</h2>
     <div id="paymentsList"><div class="empty">No payments yet</div></div>
   </div>
-
-  <div class="card">
-    <h2>Add regular payment</h2>
-    <div class="row">
-      <div class="field">
-        <label>Name</label>
-        <input type="text" id="pName" placeholder="e.g. Rent">
-      </div>
-    </div>
-    <div class="row">
-      <div class="field">
-        <label>Currency</label>
-        <div class="seg" id="currSeg">
-          <button type="button" data-c="UAH" class="active">UAH</button>
-          <button type="button" data-c="USD">USD</button>
-          <button type="button" data-c="EUR">EUR</button>
-        </div>
-      </div>
-      <div class="field">
-        <label id="amtLabel">Amount (UAH)</label>
-        <input type="number" inputmode="decimal" id="pAmount" placeholder="0" step="0.01">
-      </div>
-    </div>
-    <div class="row">
-      <div class="field">
-        <label>Days after salary</label>
-        <input type="number" inputmode="numeric" id="pDay" placeholder="e.g. 5" min="0" max="31">
-      </div>
-    </div>
-    <button class="btn" id="addBtn">Add payment</button>
-    <div class="rate-note" id="rateNote">Rate: —</div>
-  </div>
 </main>
 </div><!-- /budgetScreen -->
 
@@ -513,6 +487,7 @@
   <nav class="drawer" id="drawer">
     <div class="drawer-title">💰 <span id="drawerTitle">Daily Budget</span></div>
     <div class="drawer-who" id="drawerWho"></div>
+    <button class="drawer-item" id="menuAddPayment" type="button"><span class="mi">➕</span> Add payment</button>
     <button class="drawer-item" id="menuBudgets" type="button"><span class="mi">🏠</span> My budgets</button>
     <button class="drawer-item" id="menuHistory" type="button"><span class="mi">📊</span> Budget history</button>
     <button class="drawer-item" id="menuShare" type="button"><span class="mi">👥</span> Share &amp; members</button>
@@ -556,6 +531,47 @@
       <button class="modal-close" id="statsModalClose" type="button">✕</button>
     </div>
     <div id="statsChart"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="addPaymentBackdrop" style="display:none;">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>Add regular payment</h2>
+      <button class="modal-close" id="addPaymentClose" type="button">✕</button>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="pName" placeholder="e.g. Rent">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Currency</label>
+        <div class="seg" id="currSeg">
+          <button type="button" data-c="UAH" class="active">UAH</button>
+          <button type="button" data-c="USD">USD</button>
+          <button type="button" data-c="EUR">EUR</button>
+        </div>
+      </div>
+      <div class="field">
+        <label id="amtLabel">Amount (UAH)</label>
+        <input type="number" inputmode="decimal" id="pAmount" placeholder="0" step="0.01">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Days after salary</label>
+        <input type="number" inputmode="numeric" id="pDay" placeholder="e.g. 5" min="0" max="31">
+      </div>
+    </div>
+    <label class="checkline" for="addAnother" style="margin-top:14px;">
+      <input type="checkbox" id="addAnother">
+      <span>Add another one after saving</span>
+    </label>
+    <button class="btn" id="addBtn">Add payment</button>
+    <div class="rate-note" id="rateNote">Rate: —</div>
   </div>
 </div>
 
@@ -633,6 +649,7 @@ let usdRate = null; // 1 USD = X UAH
 let eurRate = null; // 1 EUR = X UAH
 let paidExpanded = false;
 let selectedStatIndex = null;
+let heroView = 'daily'; // 'daily' | 'remaining' — tap the hero to switch
 
 function save(){
   if(remoteReady && canEdit() && budgetRef){
@@ -944,6 +961,7 @@ function applyAccessUI(){
   $('#pDay').disabled = !editAllowed;
   $('#addBtn').disabled = !editAllowed;
   $('#currSeg').querySelectorAll('button').forEach(b => b.disabled = !editAllowed);
+  $('#menuAddPayment').style.display = editAllowed ? 'flex' : 'none';
 
   $('#budgetTitle').textContent = budgetName || 'Daily Budget';
   updateShareLink();
@@ -1122,10 +1140,19 @@ function render(){
   const daily = remaining / days;
 
   const amtEl = $('#dailyAmount');
-  amtEl.textContent = `₴${fmt(daily)}`;
-  amtEl.className = 'amount ' + (daily < 0 ? 'negative' : 'positive');
-  $('#heroDetail').textContent =
-    `(₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid) ÷ ${days} day${days===1?'':'s'}`;
+  if(heroView === 'remaining'){
+    $('#heroLabel').textContent = 'Left after payments';
+    amtEl.textContent = `₴${fmt(remaining)}`;
+    amtEl.className = 'amount ' + (remaining < 0 ? 'negative' : 'positive');
+    $('#heroDetail').textContent = `₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid`;
+  } else {
+    $('#heroLabel').textContent = 'Daily budget';
+    amtEl.textContent = `₴${fmt(daily)}`;
+    amtEl.className = 'amount ' + (daily < 0 ? 'negative' : 'positive');
+    $('#heroDetail').textContent =
+      `(₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid) ÷ ${days} day${days===1?'':'s'}`;
+  }
+  $('#heroDots').querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('active', i === (heroView === 'remaining' ? 1 : 0)));
 
   // Don't clobber the field while the user is actively typing in it.
   if(document.activeElement !== $('#leftover')){
@@ -1356,6 +1383,14 @@ function renderStatsChart(){
 }
 
 // events
+$('#heroCard').addEventListener('click', () => {
+  heroView = heroView === 'daily' ? 'remaining' : 'daily';
+  render();
+});
+$('#heroCard').addEventListener('keydown', e => {
+  if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('#heroCard').click(); }
+});
+
 $('#currSeg').addEventListener('click', e => {
   const btn = e.target.closest('button');
   if(!btn) return;
@@ -1440,6 +1475,12 @@ $('#addBtn').addEventListener('click', () => {
   $('#pAmount').value = '';
   $('#pDay').value = '';
   showToast('Payment added');
+
+  if($('#addAnother').checked){
+    $('#pName').focus();                       // keep the modal open with a fresh blank form
+  } else {
+    closeModal($('#addPaymentBackdrop'));
+  }
 });
 
 $('#paymentsList').addEventListener('click', async e => {
@@ -1547,6 +1588,7 @@ function closeDrawer(){ hideOverlay($('#drawerBackdrop')); }
 
 $('#menuBtn').addEventListener('click', openDrawer);
 $('#drawerBackdrop').addEventListener('click', e => { if(e.target === $('#drawerBackdrop')) closeDrawer(); });
+$('#menuAddPayment').addEventListener('click', () => { closeDrawer(); openAddPayment(); });
 $('#menuBudgets').addEventListener('click', () => { closeDrawer(); goHome(); });
 $('#menuHistory').addEventListener('click', () => { closeDrawer(); selectedStatIndex = null; renderStatsChart(); openModal($('#statsModalBackdrop')); });
 $('#menuShare').addEventListener('click', () => { closeDrawer(); openModal($('#shareModalBackdrop')); });
@@ -1560,6 +1602,16 @@ $('#shareModalBackdrop').addEventListener('click', e => {
 $('#statsModalClose').addEventListener('click', () => closeModal($('#statsModalBackdrop')));
 $('#statsModalBackdrop').addEventListener('click', e => {
   if(e.target === $('#statsModalBackdrop')) closeModal($('#statsModalBackdrop'));
+});
+
+function openAddPayment(){
+  if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
+  openModal($('#addPaymentBackdrop'));
+  setTimeout(() => $('#pName').focus(), 60);
+}
+$('#addPaymentClose').addEventListener('click', () => closeModal($('#addPaymentBackdrop')));
+$('#addPaymentBackdrop').addEventListener('click', e => {
+  if(e.target === $('#addPaymentBackdrop')) closeModal($('#addPaymentBackdrop'));
 });
 
 window.addEventListener('popstate', () => route());
