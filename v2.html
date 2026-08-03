@@ -1508,12 +1508,19 @@ function oneoffDueDate(o){
   return new Date(o.date);
 }
 function todayMidnight(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
-function oneoffCounts(o){
-  // Counts against the budget while unpaid and not past. Once the date passes we stop counting —
-  // by then it's assumed reflected in the card balance, so counting again would double-subtract.
-  if(o.paid) return false;
-  return oneoffDueDate(o).getTime() >= todayMidnight().getTime();
+// A one-off only affects THIS cycle's budget when it's unpaid, not past, and due before the next
+// salary. Ones due after payday belong to the next cycle; past ones are assumed already reflected
+// in the card balance — counting either would be wrong.
+function oneoffState(o){
+  if(o.paid) return 'paid';
+  const due = oneoffDueDate(o).getTime();
+  const today = todayMidnight().getTime();
+  const nextSal = nextSalaryDate(new Date()).getTime();
+  if(due < today) return 'past';
+  if(due >= nextSal) return 'future';   // next salary cycle
+  return 'active';
 }
+function oneoffCounts(o){ return oneoffState(o) === 'active'; }
 function unpaidOneoffTotal(){
   return (state.oneoffs || []).filter(oneoffCounts).reduce((s,o) => s + (Number(o.amountUAH)||0), 0);
 }
@@ -1522,15 +1529,16 @@ function oneoffRowHtml(o){
   const eurLine = o.currency === 'EUR' ? `<div class="usd">€${fmt(o.amountEUR)}</div>` : '';
   const due = oneoffDueDate(o);
   const dueLabel = due.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
-  const past = !o.paid && due.getTime() < todayMidnight().getTime();
+  const st = oneoffState(o);
+  const dim = (st === 'past' || st === 'future') ? 'past' : '';
+  const note = st === 'paid' ? ' · paid' : st === 'past' ? ' · past' : st === 'future' ? ' · next cycle' : '';
   const chip = o.category ? catChipHtml(o.category) + ' ' : '';
-  const status = o.paid ? ' · paid' : (past ? ' · past' : '');
   return `
-  <div class="payment ${o.paid?'paid':''} ${past?'past':''}" data-id="${escapeHtml(o.id)}">
+  <div class="payment ${o.paid?'paid':''} ${dim}" data-id="${escapeHtml(o.id)}">
     <div class="check" data-action="toggle">${o.paid?'✓':''}</div>
     <div class="info">
       <div class="name ${o.paid?'paid-strike':''}">${escapeHtml(o.name)}</div>
-      <div class="meta">${chip}${dueLabel}${status}</div>
+      <div class="meta">${chip}${dueLabel}${note}</div>
     </div>
     <div class="amt">
       <div class="uah">₴${fmt(o.amountUAH)}</div>
