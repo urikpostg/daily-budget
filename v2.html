@@ -1164,6 +1164,21 @@ function currentDaySubtitle(){
   return { salary, days };
 }
 
+// Animate a .collapse open/closed via the Web Animations API. Reliable on iOS Safari,
+// where a max-height CSS transition set in the same tick as a scrollHeight read often doesn't fire.
+function animateCollapse(coll, open){
+  if(coll._anim){ coll._anim.cancel(); coll._anim = null; }
+  const startH = coll.getBoundingClientRect().height;          // current rendered height (handles interrupts)
+  coll.style.maxHeight = open ? 'none' : '0px';                // rest state (content-agnostic when open)
+  const endH = open ? coll.getBoundingClientRect().height : 0; // measured target
+  const a = coll.animate(
+    [{ maxHeight: startH + 'px' }, { maxHeight: endH + 'px' }],
+    { duration: reduceMotion ? 0 : 280, easing: 'cubic-bezier(.22,.61,.36,1)' }
+  );
+  coll._anim = a;
+  a.onfinish = a.oncancel = () => { if(coll._anim === a) coll._anim = null; };
+}
+
 function render(){
   const { days } = currentDaySubtitle();
 
@@ -1227,14 +1242,7 @@ function render(){
         paidToggleBtn.classList.toggle('open', paidExpanded);
         const count = state.payments.filter(p => p.paid).length;
         paidToggleBtn.querySelector('.lbl').textContent = `${paidExpanded ? 'Hide paid' : 'Paid'} (${count})`;
-        if(paidExpanded){
-          coll.style.maxHeight = coll.scrollHeight + 'px';
-          const onEnd = () => { coll.style.maxHeight = 'none'; coll.removeEventListener('transitionend', onEnd); };
-          coll.addEventListener('transitionend', onEnd);
-        } else {
-          coll.style.maxHeight = coll.scrollHeight + 'px';      // pin current height first…
-          requestAnimationFrame(() => requestAnimationFrame(() => { coll.style.maxHeight = '0'; })); // …then collapse
-        }
+        animateCollapse(coll, paidExpanded);
       });
     }
   }
