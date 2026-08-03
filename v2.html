@@ -161,9 +161,18 @@
     padding:22px 20px;
     margin-bottom:16px;
     text-align:center;
-    cursor:pointer;
+    cursor:grab;
+    touch-action:pan-y;                 /* let the page scroll vertically; we handle horizontal */
+    user-select:none; -webkit-user-select:none;
   }
-  .hero:active{ opacity:.9; }
+  .hero.grabbing{ cursor:grabbing; }
+  .hero-viewport{ overflow:hidden; }
+  .hero-track{
+    display:flex; width:200%;
+    transition:transform .32s var(--ease-out); will-change:transform;
+  }
+  .hero-track.dragging{ transition:none; }   /* follow the finger 1:1 while dragging */
+  .hero-slide{ flex:0 0 50%; width:50%; }
   .hero-dots{ display:flex; gap:6px; justify-content:center; margin-top:12px; }
   .hero-dots .dot{ width:6px; height:6px; border-radius:50%; background:var(--border); transition:background .2s; }
   .hero-dots .dot.active{ background:var(--muted); }
@@ -222,7 +231,7 @@
 
   @media (prefers-reduced-motion: reduce){
     .drawer, .modal-sheet, .drawer-backdrop, .modal-backdrop,
-    .collapse, .paid-toggle .chev, .check{ transition-duration:.001s !important; }
+    .collapse, .paid-toggle .chev, .check, .hero-track{ transition-duration:.001s !important; }
     .check.checking, .check.unchecking{ animation-duration:.001s !important; }
   }
 
@@ -469,10 +478,21 @@
 </header>
 
 <main>
-  <div class="hero" id="heroCard" role="button" tabindex="0" title="Tap to switch view">
-    <div class="label" id="heroLabel">Daily budget</div>
-    <div class="amount" id="dailyAmount">₴0</div>
-    <div class="detail" id="heroDetail">—</div>
+  <div class="hero" id="heroCard" role="group" tabindex="0" aria-label="Budget summary — swipe to switch" title="Swipe to switch view">
+    <div class="hero-viewport" id="heroViewport">
+      <div class="hero-track" id="heroTrack">
+        <div class="hero-slide">
+          <div class="label">Daily budget</div>
+          <div class="amount" id="amtDaily">₴0</div>
+          <div class="detail" id="detailDaily">—</div>
+        </div>
+        <div class="hero-slide">
+          <div class="label">Left after payments</div>
+          <div class="amount" id="amtRemain">₴0</div>
+          <div class="detail" id="detailRemain">—</div>
+        </div>
+      </div>
+    </div>
     <div class="hero-dots" id="heroDots"><span class="dot active"></span><span class="dot"></span></div>
   </div>
 
@@ -1155,20 +1175,17 @@ function render(){
   const remaining = leftover - unpaidTotal;
   const daily = remaining / days;
 
-  const amtEl = $('#dailyAmount');
-  if(heroView === 'remaining'){
-    $('#heroLabel').textContent = 'Left after payments';
-    amtEl.textContent = `₴${fmt(remaining)}`;
-    amtEl.className = 'amount ' + (remaining < 0 ? 'negative' : 'positive');
-    $('#heroDetail').textContent = `₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid`;
-  } else {
-    $('#heroLabel').textContent = 'Daily budget';
-    amtEl.textContent = `₴${fmt(daily)}`;
-    amtEl.className = 'amount ' + (daily < 0 ? 'negative' : 'positive');
-    $('#heroDetail').textContent =
-      `(₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid) ÷ ${days} day${days===1?'':'s'}`;
-  }
-  $('#heroDots').querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('active', i === (heroView === 'remaining' ? 1 : 0)));
+  const dailyEl = $('#amtDaily');
+  dailyEl.textContent = `₴${fmt(daily)}`;
+  dailyEl.className = 'amount ' + (daily < 0 ? 'negative' : 'positive');
+  $('#detailDaily').textContent = `(₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid) ÷ ${days} day${days===1?'':'s'}`;
+
+  const remainEl = $('#amtRemain');
+  remainEl.textContent = `₴${fmt(remaining)}`;
+  remainEl.className = 'amount ' + (remaining < 0 ? 'negative' : 'positive');
+  $('#detailRemain').textContent = `₴${fmt(leftover)} left − ₴${fmt(unpaidTotal)} unpaid`;
+
+  updateHeroPosition();
 
   // Don't clobber the field while the user is actively typing in it.
   if(document.activeElement !== $('#leftover')){
@@ -1398,15 +1415,64 @@ function renderStatsChart(){
   });
 }
 
-// events
-$('#heroCard').addEventListener('click', () => {
-  heroView = heroView === 'daily' ? 'remaining' : 'daily';
-  render();
-});
-$('#heroCard').addEventListener('keydown', e => {
-  if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('#heroCard').click(); }
+// ---- Hero carousel: swipe / drag between "Daily budget" and "Left after payments" ----
+const heroCard = $('#heroCard');
+const heroTrack = $('#heroTrack');
+const heroViewport = $('#heroViewport');
+
+function heroIndex(){ return heroView === 'remaining' ? 1 : 0; }
+function updateHeroPosition(){
+  heroTrack.style.transform = `translateX(${-50 * heroIndex()}%)`;
+  $('#heroDots').querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('active', i === heroIndex()));
+}
+
+let hDrag = null;
+function heroDown(e){
+  if(e.pointerType === 'mouse' && e.button !== 0) return;
+  hDrag = { x0:e.clientX, y0:e.clientY, decided:false, horizontal:false };
+}
+function heroMove(e){
+  if(!hDrag) return;
+  const dx = e.clientX - hDrag.x0, dy = e.clientY - hDrag.y0;
+  if(!hDrag.decided){
+    if(Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    hDrag.decided = true;
+    hDrag.horizontal = Math.abs(dx) > Math.abs(dy);
+    if(!hDrag.horizontal){ hDrag = null; return; }   // vertical → let the page scroll
+    heroTrack.classList.add('dragging');
+    heroCard.classList.add('grabbing');
+    try{ heroCard.setPointerCapture(e.pointerId); }catch(_){}
+  }
+  const w = heroViewport.clientWidth || 1;
+  let off = -50 * heroIndex() + (dx / w) * 50;        // percent of track === dx pixels
+  if(off > 0) off *= 0.3;                             // rubber-band before the first slide
+  if(off < -50) off = -50 + (off + 50) * 0.3;         // …and after the last
+  heroTrack.style.transform = `translateX(${off}%)`;
+}
+function heroUp(e){
+  if(!hDrag) return;
+  const wasH = hDrag.horizontal;
+  const dx = e.clientX - hDrag.x0;
+  hDrag = null;
+  heroTrack.classList.remove('dragging');             // re-enable the snap transition
+  heroCard.classList.remove('grabbing');
+  if(!wasH){ return; }
+  const threshold = (heroViewport.clientWidth || 1) * 0.2;
+  const idx = heroIndex();
+  if(dx <= -threshold && idx === 0) heroView = 'remaining';
+  else if(dx >= threshold && idx === 1) heroView = 'daily';
+  updateHeroPosition();
+}
+heroCard.addEventListener('pointerdown', heroDown);
+heroCard.addEventListener('pointermove', heroMove);
+heroCard.addEventListener('pointerup', heroUp);
+heroCard.addEventListener('pointercancel', heroUp);
+heroCard.addEventListener('keydown', e => {
+  if(e.key === 'ArrowRight' && heroIndex() === 0){ e.preventDefault(); heroView = 'remaining'; updateHeroPosition(); }
+  else if(e.key === 'ArrowLeft' && heroIndex() === 1){ e.preventDefault(); heroView = 'daily'; updateHeroPosition(); }
 });
 
+// events
 $('#currSeg').addEventListener('click', e => {
   const btn = e.target.closest('button');
   if(!btn) return;
