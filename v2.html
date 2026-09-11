@@ -491,6 +491,16 @@
   .segc button.active{ background:var(--accent2); color:#fff; }
 
   .payment.past{ opacity:.7; }
+  /* Salary tax block + the gross → net breakdown it previews */
+  .taxbox{ border-top:1px solid var(--border); margin-top:14px; padding-top:14px; }
+  .brk{ background:var(--card2); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-top:12px; text-align:left; }
+  .brk .l{ display:flex; justify-content:space-between; gap:10px; font-size:13px; padding:3px 0; color:var(--muted); }
+  .brk .l .v{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .brk .l.neg .v{ color:var(--danger); }
+  .brk .tot{ display:flex; justify-content:space-between; gap:10px; align-items:baseline; border-top:1px solid var(--border); margin-top:8px; padding-top:9px; }
+  .brk .tot .k{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .brk .tot .v{ font-size:19px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+
   .prompt-ic{ width:52px; height:52px; margin:2px auto 6px; border-radius:15px; background:var(--card2); border:1px solid var(--border); color:var(--text); display:flex; align-items:center; justify-content:center; }
   .prompt-ic svg{ width:28px; height:28px; }
   .btn.ghost{ background:transparent; color:var(--muted); border:1px solid var(--border); }
@@ -826,6 +836,25 @@
         <div class="field"><input type="number" id="setSalaryAmount" inputmode="decimal" placeholder="0" step="0.01"></div>
       </div>
       <div class="rate-note" style="text-align:left; margin-top:8px;">On pay day the app asks whether to add this to “what's left”, converting to ₴ at that day's rate. Weekend pay days shift to Fri/Mon.</div>
+
+      <div class="taxbox">
+        <label class="checkline" for="setTaxOn" style="margin:0 0 12px;">
+          <input type="checkbox" id="setTaxOn">
+          <span>Deduct taxes from this amount</span>
+        </label>
+        <div class="row">
+          <div class="field">
+            <label for="setTaxPercent">Tax on income (%)</label>
+            <input type="number" id="setTaxPercent" inputmode="decimal" placeholder="6" step="0.1" min="0" max="100">
+          </div>
+          <div class="field">
+            <label for="setEsv">ЄСВ (₴ per month)</label>
+            <input type="number" id="setEsv" inputmode="decimal" placeholder="0" step="0.01" min="0">
+          </div>
+        </div>
+        <div class="rate-note" style="text-align:left; margin-top:7px;">ФОП 3 група: 5% єдиний податок + 1% військовий збір = 6%. ЄСВ is a fixed monthly sum — enter your current one, it isn't a percentage.</div>
+        <div class="brk" id="taxPreview"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -873,6 +902,7 @@
     <div class="prompt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5"/><line x1="8" y1="3" x2="8" y2="6"/><line x1="16" y1="3" x2="16" y2="6"/></svg></div>
     <div style="font-size:17px; font-weight:800; margin:2px 0 4px;">It's pay day</div>
     <div id="salaryPromptMsg" style="font-size:13px; color:var(--muted); line-height:1.5;"></div>
+    <div class="brk" id="salaryPromptBrk" style="display:none;"></div>
     <button class="btn" id="salaryPromptAdd">Add to balance</button>
     <button class="btn ghost" id="salaryPromptDismiss" style="margin-top:8px;">Not now</button>
     <button class="btn ghost" id="salaryPromptSkip" style="margin-top:8px;">Skip this month</button>
@@ -957,7 +987,11 @@ function isOwner(){ return !!(currentUser && ownerUid && currentUser.uid === own
 function isMember(){ return !!(currentUser && members.includes(currentUser.uid)); }
 function canEdit(){ return isOwner() || isMember(); }
 
-const DEFAULT_SETTINGS = { salaryDay: 15, salaryAmount: 0, salaryCurrency: 'UAH' };
+const DEFAULT_SETTINGS = {
+  salaryDay: 15, salaryAmount: 0, salaryCurrency: 'UAH',
+  // Tax is opt-in, so existing budgets keep adding the full salary until it's switched on.
+  taxEnabled: false, taxPercent: 6, esvMonthly: 0
+};
 const DEFAULT_CATEGORIES = [
   { id:'housing', name:'Housing', color:'#0a84ff' },
   { id:'utilities', name:'Utilities', color:'#22b39a' },
@@ -1896,6 +1930,60 @@ function removeCategory(id){
 }
 
 // ---------- Settings ----------
+// ---------- Salary tax (ФОП) ----------
+// Two deductions of different shapes: the percentage is a share of income (5% єдиний податок
+// + 1% військовий збір), while ЄСВ is a flat monthly sum that doesn't scale with what you
+// earn — so they're subtracted separately, never folded into one combined rate. Tax leaves
+// the ФОП account before the money reaches the card, so the app only ever adds the net.
+function computeNet(gross, on, pct, esv){
+  const g = Number(gross) || 0;
+  const pctAmount = on ? g * ((Number(pct) || 0) / 100) : 0;
+  const esvAmount = on ? (Number(esv) || 0) : 0;
+  return { gross: g, taxed: !!on, pctAmount, esvAmount, net: Math.max(0, g - pctAmount - esvAmount) };
+}
+
+// Gross ₴ → what lands on the card, using the saved settings.
+function salaryNetFor(grossUAH){
+  const s = state.settings || DEFAULT_SETTINGS;
+  return computeNet(grossUAH, s.taxEnabled, s.taxPercent, s.esvMonthly);
+}
+
+function breakdownHtml(b, pct, grossLabel){
+  let html = `<div class="l"><span>Income before tax</span><span class="v">${grossLabel || '₴' + fmt0(b.gross)}</span></div>`;
+  if(b.taxed){
+    html += `<div class="l neg"><span>Tax on income · ${Number(pct) || 0}%</span><span class="v">−₴${fmt0(b.pctAmount)}</span></div>`;
+    html += `<div class="l neg"><span>ЄСВ · fixed</span><span class="v">−₴${fmt0(b.esvAmount)}</span></div>`;
+  }
+  html += `<div class="tot"><span class="k">Lands on card</span><span class="v">₴${fmt0(b.net)}</span></div>`;
+  return html;
+}
+
+// Live preview in Settings — reads the form, not the saved state, so it follows as you type.
+function renderTaxPreview(){
+  const box = $('#taxPreview');
+  if(!box) return;
+  const on = $('#setTaxOn').checked;
+  $('#setTaxPercent').disabled = !on;
+  $('#setEsv').disabled = !on;
+  const amount = parseFloat($('#setSalaryAmount').value) || 0;
+  // With tax off there's nothing to break down — the two rows would just restate the field above.
+  if(!on || amount <= 0){ box.style.display = 'none'; return; }
+
+  // The salary can be set in $ or €; tax comes off the converted ₴ figure, since ЄСВ is a ₴ sum.
+  const cur = setSalaryCurrency;
+  const rate = cur === 'USD' ? usdRate : cur === 'EUR' ? eurRate : 1;
+  if(!rate){ box.style.display = 'none'; return; }
+  const gross = amount * rate;
+  const label = cur === 'UAH'
+    ? '₴' + fmt0(gross)
+    : `${cur === 'USD' ? '$' : '€'}${fmt(amount)} ≈ ₴${fmt0(gross)}`;
+
+  const pct = $('#setTaxPercent').value;
+  const b = computeNet(gross, on, pct, $('#setEsv').value);
+  box.style.display = 'block';
+  box.innerHTML = breakdownHtml(b, pct, label);
+}
+
 function openSettings(){
   if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
   const s = state.settings || DEFAULT_SETTINGS;
@@ -1903,6 +1991,10 @@ function openSettings(){
   $('#setSalaryAmount').value = s.salaryAmount ? String(s.salaryAmount) : '';
   setSalaryCurrency = s.salaryCurrency || 'UAH';
   $('#setSalaryCurr').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.c === setSalaryCurrency));
+  $('#setTaxOn').checked = !!s.taxEnabled;
+  $('#setTaxPercent').value = (s.taxPercent === null || s.taxPercent === undefined) ? 6 : s.taxPercent;
+  $('#setEsv').value = s.esvMonthly ? String(s.esvMonthly) : '';
+  renderTaxPreview();
   $('#newCatName').value = '';
   renderCatManage();
   openModal($('#settingsBackdrop'));
@@ -1915,7 +2007,10 @@ function saveSettings(){
   state.settings = {
     salaryDay: day,
     salaryAmount: parseFloat($('#setSalaryAmount').value) || 0,
-    salaryCurrency: setSalaryCurrency
+    salaryCurrency: setSalaryCurrency,
+    taxEnabled: $('#setTaxOn').checked,
+    taxPercent: Math.min(Math.max(parseFloat($('#setTaxPercent').value) || 0, 0), 100),
+    esvMonthly: Math.max(parseFloat($('#setEsv').value) || 0, 0)
   };
   save();
   render();     // pay-day change can move dates
@@ -1939,10 +2034,23 @@ function maybeShowSalaryPrompt(){
   let uah = amount, conv = '';
   if(cur === 'USD'){ if(!usdRate) return; uah = amount * usdRate; conv = `$${fmt(amount)} ≈ `; }
   else if(cur === 'EUR'){ if(!eurRate) return; uah = amount * eurRate; conv = `€${fmt(amount)} ≈ `; }
-  $('#salaryPromptMsg').innerHTML = `Add your salary to “what's left on card”?<br><b style="color:var(--text);">${conv}₴${fmt(uah)}</b>${cur !== 'UAH' ? ' at today\'s rate' : ''}`;
+
+  // Tax comes off the converted ₴ figure — ЄСВ is a ₴ sum, so it can't be applied before conversion.
+  const b = salaryNetFor(uah);
+  const brk = $('#salaryPromptBrk');
+  if(b.taxed){
+    // Show the working, otherwise the offered figure looks arbitrary against the configured salary.
+    $('#salaryPromptMsg').innerHTML = `Add your salary to “what's left on card”?`;
+    brk.innerHTML = breakdownHtml(b, s.taxPercent, conv ? `${conv}₴${fmt0(uah)}` : `₴${fmt0(uah)}`);
+    brk.style.display = 'block';
+  } else {
+    $('#salaryPromptMsg').innerHTML = `Add your salary to “what's left on card”?<br><b style="color:var(--text);">${conv}₴${fmt(uah)}</b>${cur !== 'UAH' ? ' at today\'s rate' : ''}`;
+    brk.style.display = 'none';
+  }
+
   const addBtn = $('#salaryPromptAdd');
-  addBtn.textContent = `Add ₴${fmt(uah)} to balance`;
-  addBtn.dataset.uah = uah;
+  addBtn.textContent = `Add ₴${fmt(b.net)} to balance`;
+  addBtn.dataset.uah = b.net;
   addBtn.dataset.key = key;
   openModal($('#salaryPromptBackdrop'));
 }
@@ -2396,7 +2504,12 @@ $('#setSalaryCurr').addEventListener('click', e => {
   const b = e.target.closest('button'); if(!b) return;
   setSalaryCurrency = b.dataset.c;
   [...$('#setSalaryCurr').children].forEach(x => x.classList.toggle('active', x === b));
+  renderTaxPreview();
 });
+['#setSalaryAmount', '#setTaxPercent', '#setEsv'].forEach(sel => {
+  $(sel).addEventListener('input', renderTaxPreview);
+});
+$('#setTaxOn').addEventListener('change', renderTaxPreview);
 $('#addCatBtn').addEventListener('click', () => {
   const name = $('#newCatName').value.trim();
   if(!name){ showToast('Enter a category name'); return; }
