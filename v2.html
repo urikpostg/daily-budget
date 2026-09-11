@@ -216,6 +216,26 @@
   .row{display:flex; gap:10px; align-items:center;}
   .row + .row{margin-top:10px;}
 
+  /* Totals strip above a list: what the cycle costs, how much is settled, what's still out. */
+  .sum{
+    display:flex; background:var(--card2); border:1px solid var(--border);
+    border-radius:12px; padding:10px 4px; margin-bottom:12px;
+  }
+  .sum .cell{flex:1; min-width:0; text-align:center; padding:0 6px; position:relative;}
+  .sum .cell + .cell::before{
+    content:''; position:absolute; left:0; top:4px; bottom:4px; width:1px; background:var(--border);
+  }
+  .sum .k{
+    font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .sum .v{
+    font-size:14.5px; font-weight:800; margin-top:3px; letter-spacing:-.02em;
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  .sum .v.dim{color:var(--muted); font-weight:700;}
+
   .card-toggle{
     display:flex; align-items:center; justify-content:space-between;
     width:100%; background:none; border:none; padding:0; margin:0;
@@ -606,11 +626,21 @@
 
   <div class="card">
     <h2>Regular payments</h2>
+    <div class="sum" id="paymentsSummary" style="display:none;">
+      <div class="cell"><div class="k">Total</div><div class="v" id="sumPayTotal">₴0</div></div>
+      <div class="cell"><div class="k">Paid</div><div class="v dim" id="sumPayPaid">₴0</div></div>
+      <div class="cell"><div class="k">Left</div><div class="v" id="sumPayLeft">₴0</div></div>
+    </div>
     <div id="paymentsList"><div class="empty">No payments yet</div></div>
   </div>
 
   <div class="card">
     <h2>One-off expenses</h2>
+    <div class="sum" id="oneoffSummary" style="display:none;">
+      <div class="cell"><div class="k">This cycle</div><div class="v" id="sumOneTotal">₴0</div></div>
+      <div class="cell"><div class="k">Paid</div><div class="v dim" id="sumOnePaid">₴0</div></div>
+      <div class="cell"><div class="k">Left</div><div class="v" id="sumOneLeft">₴0</div></div>
+    </div>
     <div id="oneoffList"><div class="empty">No one-off expenses</div></div>
   </div>
 </main>
@@ -1399,6 +1429,12 @@ function fmt(n){
   return (Math.round(n*100)/100).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
+// Whole hryvnia, for summary figures only. Three of these share one phone-width row, and
+// "₴139,596.00" doesn't fit — kopecks buy nothing in a total and cost three characters.
+function fmt0(n){
+  return Math.round(n).toLocaleString('en-US');
+}
+
 function isWeekend(d){
   const day = d.getDay();
   return day === 0 || day === 6;
@@ -1612,6 +1648,8 @@ function render(){
 
   updateHeroPosition();
   renderSavingsCard();
+  renderPaymentsSummary();
+  renderOneoffSummary();
   renderOneoffList();
 
   // Don't clobber the field while the user is actively typing in it.
@@ -1732,6 +1770,53 @@ function oneoffRowHtml(o){
     <button class="del" data-action="delete">✕</button>
   </div>`;
 }
+// ---------- Totals strips ----------
+// Regular payments: the whole monthly bill, paid and unpaid alike. "Left" is exactly the
+// figure the daily budget subtracts, so the strip explains where the hero number comes from.
+function renderPaymentsSummary(){
+  const el = $('#paymentsSummary');
+  if(!el) return;
+  const items = state.payments || [];
+  if(items.length === 0){ el.style.display = 'none'; return; }
+  const sum = list => list.reduce((s,p) => s + (Number(p.amountUAH)||0), 0);
+  const total = sum(items);
+  const paid = sum(items.filter(p => p.paid));
+  el.style.display = 'flex';
+  $('#sumPayTotal').textContent = '₴' + fmt0(total);
+  $('#sumPayPaid').textContent  = '₴' + fmt0(paid);
+  $('#sumPayLeft').textContent  = '₴' + fmt0(total - paid);
+}
+
+// One-offs are dated, so "total" only makes sense over the current salary cycle — one due next
+// cycle isn't this month's cost. Past-dated unpaid ones are left out too: the budget already
+// ignores them (they're assumed to have left the card balance, and the row reads "· past"), so
+// counting them here would show a "Left" the daily budget isn't actually subtracting. What
+// remains is paid + active, which both reconciles (total = paid + left) and matches the hero.
+function oneoffsThisCycle(){
+  const now = new Date();
+  const from = lastSalaryDate(now).getTime();
+  const to = nextSalaryDate(now).getTime();
+  const today = todayMidnight().getTime();
+  return (state.oneoffs || []).filter(o => {
+    const due = oneoffDueDate(o).getTime();
+    if(due < from || due >= to) return false;
+    return o.paid || due >= today;
+  });
+}
+function renderOneoffSummary(){
+  const el = $('#oneoffSummary');
+  if(!el) return;
+  const items = oneoffsThisCycle();
+  if(items.length === 0){ el.style.display = 'none'; return; }
+  const sum = list => list.reduce((s,o) => s + (Number(o.amountUAH)||0), 0);
+  const total = sum(items);
+  const paid = sum(items.filter(o => o.paid));
+  el.style.display = 'flex';
+  $('#sumOneTotal').textContent = '₴' + fmt0(total);
+  $('#sumOnePaid').textContent  = '₴' + fmt0(paid);
+  $('#sumOneLeft').textContent  = '₴' + fmt0(total - paid);
+}
+
 function renderOneoffList(){
   const list = $('#oneoffList');
   if(!list) return;
