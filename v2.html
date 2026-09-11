@@ -114,6 +114,13 @@
     display:flex; flex-direction:column;
     box-shadow:12px 0 40px rgba(0,0,0,.35);
     transform:translateX(-100%); transition:transform var(--dur) var(--ease-out);
+    overflow-y:auto; overscroll-behavior:contain;
+  }
+
+  /* While any overlay is open the page behind must not move. overflow:hidden alone doesn't
+     hold on iOS Safari, so the body is pinned and its scroll offset restored on close. */
+  body.modal-open{
+    position:fixed; left:0; right:0; width:100%; overflow:hidden;
   }
   .drawer-backdrop.show .drawer{ transform:translateX(0); }
   .drawer-title{ font-size:20px; font-weight:800; margin:0 0 2px 6px; }
@@ -143,7 +150,13 @@
     width:100%; max-width:520px;
     border-radius:20px 20px 0 0;
     padding:18px 16px calc(18px + env(safe-area-inset-bottom));
-    max-height:85vh; overflow-y:auto;
+    /* dvh tracks the *visible* viewport; iOS reports vh as the toolbar-hidden height, which
+       makes the sheet taller than the screen and hides its bottom rows. vh stays as fallback. */
+    max-height:85vh;
+    max-height:85dvh;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;   /* don't hand the scroll to the page behind at either end */
     transform:var(--sheet-from); opacity:var(--sheet-from-op);
     transition:transform var(--dur) var(--ease-out), opacity var(--dur) ease;
   }
@@ -521,7 +534,7 @@
     #unpaidGrid .payment, #paidGrid .payment, #oneoffGrid .payment{ margin-bottom:0; height:100%; }
 
     .modal-backdrop{ align-items:center; padding:20px; --sheet-from:scale(.92); --sheet-from-op:0; }
-    .modal-sheet{ border-radius:20px; max-width:520px; max-height:80vh; }
+    .modal-sheet{ border-radius:20px; max-width:520px; max-height:80vh; max-height:80dvh; }
   }
 </style>
 </head>
@@ -2603,16 +2616,39 @@ $('#myBudgetsList').addEventListener('click', e => {
 // Animated overlay show/hide — fade the backdrop + slide/scale the panel, then unmount.
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const OVERLAY_DUR = reduceMotion ? 10 : 300;
+// Body scroll lock. Tracked as a set rather than a counter so a double close (backdrop tap
+// that also fires a button handler) can't unlock while another overlay is still open —
+// Settings opening the category prompt on top of itself is the case that stacks.
+const openOverlays = new Set();
+let lockedScrollY = 0;
+
+function lockScroll(){
+  if(document.body.classList.contains('modal-open')) return;
+  lockedScrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.style.top = `-${lockedScrollY}px`;
+  document.body.classList.add('modal-open');
+}
+function unlockScroll(){
+  if(!document.body.classList.contains('modal-open')) return;
+  document.body.classList.remove('modal-open');
+  document.body.style.top = '';
+  window.scrollTo(0, lockedScrollY);   // pinning the body drops the offset; put it back
+}
+
 function showOverlay(el){
   clearTimeout(el._hideT);
   el.style.display = 'flex';
   void el.offsetWidth;              // force reflow so the transition runs from the hidden state
   el.classList.add('show');
+  openOverlays.add(el);
+  lockScroll();
 }
 function hideOverlay(el){
   el.classList.remove('show');
   clearTimeout(el._hideT);
   el._hideT = setTimeout(() => { el.style.display = 'none'; }, OVERLAY_DUR);
+  openOverlays.delete(el);
+  if(openOverlays.size === 0) unlockScroll();
 }
 function openModal(el){ showOverlay(el); }
 function closeModal(el){ hideOverlay(el); }
