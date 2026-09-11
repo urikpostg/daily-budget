@@ -18,6 +18,14 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2">
 <link rel="icon" href="favicon.ico?v=2" sizes="any">
 <title>Daily Budget</title>
+<!-- Start the TLS handshakes during parse so the Firebase modules and the first Firestore
+     round-trip don't each pay for connection setup after the page has loaded. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://accounts.google.com" crossorigin>
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
   :root{
@@ -281,6 +289,9 @@
     background:var(--accent2);
     color:#fff;
   }
+  /* "Days after salary" is long — let it shrink rather than overflow on a narrow phone. */
+  #whenSeg button{ font-size:13px; padding:8px 4px; }
+  .due-prev{ font-size:12px; color:var(--muted); margin-top:6px; min-height:15px; }
 
   .btn{
     display:block;
@@ -342,6 +353,11 @@
   .payment.paid .check::after{ content:''; }
   .payment .info{flex:1 1 auto; min-width:0; cursor:pointer;}
   .payment .name{font-weight:600; font-size:15px; overflow-wrap:anywhere;}
+  /* inline-block keeps the pencil out of the parent's line-through when a payment is paid */
+  .payment .name .pen{ opacity:.4; display:inline-block; vertical-align:-1px; margin-left:5px; transition:opacity .15s; }
+  .payment .name .pen svg{ width:13px; height:13px; display:block; }
+  .payment .info:active .pen{ opacity:.9; }
+  body.readonly .payment .pen{ display:none; }
   .payment .name.paid-strike{text-decoration:line-through;}
   .payment .meta{font-size:12.5px; color:var(--muted); margin-top:2px;}
   .payment .amt{text-align:right; flex:0 0 auto; white-space:nowrap;}
@@ -398,6 +414,25 @@
     margin:0 auto 16px; box-shadow:0 8px 24px rgba(0,0,0,.28);
   }
   .muted{ color:var(--muted); text-align:center; font-size:14px; margin:8px 0 24px; }
+  /* Landing: the budget you were last in, promoted above Create / All budgets. */
+  .last-card{
+    display:flex; align-items:center; gap:12px; text-align:left; cursor:pointer;
+    background:var(--card); border:1px solid var(--accent2); border-radius:14px;
+    padding:13px 15px; margin-bottom:12px;
+    transition:transform .12s var(--ease-out), opacity .12s;
+  }
+  .last-card:active{ transform:scale(.98); opacity:.85; }
+  .last-card .lc-ic{
+    width:36px; height:36px; min-width:36px; border-radius:10px;
+    background:rgba(10,132,255,.14); color:var(--accent2);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .last-card .lc-ic svg{ width:19px; height:19px; }
+  .last-card .lc-txt{ flex:1; min-width:0; }
+  .last-card .lc-name{ font-weight:700; font-size:15px; overflow-wrap:anywhere; }
+  .last-card .lc-sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .last-card .lc-chev{ color:var(--muted); font-size:19px; flex:0 0 auto; }
+
   .budget-item{
     display:flex; align-items:center; gap:12px;
     background:var(--card); border:1px solid var(--border);
@@ -486,8 +521,16 @@
     <img src="apple-touch-icon.png?v=2" alt="" class="app-logo">
     <h1 style="font-size:26px;">Daily Budget</h1>
     <p class="muted" id="landingWho"></p>
+    <div class="last-card" id="lastBudgetCard" style="display:none;" role="button" tabindex="0">
+      <div class="lc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      <div class="lc-txt">
+        <div class="lc-name" id="lastBudgetName">Budget</div>
+        <div class="lc-sub">Continue where you left off</div>
+      </div>
+      <div class="lc-chev">›</div>
+    </div>
     <button class="btn" id="createBudgetBtn">➕ Create new budget</button>
-    <button class="btn secondary" id="joinBudgetBtn">📂 Open existing budget</button>
+    <button class="btn secondary" id="joinBudgetBtn">📂 All budgets</button>
     <button class="btn secondary" id="landingSignOutBtn" style="margin-top:28px;">Sign out</button>
   </div>
 </div>
@@ -630,7 +673,7 @@
 <div class="modal-backdrop" id="addPaymentBackdrop" style="display:none;">
   <div class="modal-sheet">
     <div class="modal-header">
-      <h2>Add expense</h2>
+      <h2 id="addExpenseTitle">Add expense</h2>
       <button class="modal-close" id="addPaymentClose" type="button">✕</button>
     </div>
     <div class="seg2" id="kindSeg">
@@ -665,8 +708,25 @@
     </div>
     <div class="row" id="regWhen">
       <div class="field">
+        <label>When</label>
+        <div class="seg" id="whenSeg">
+          <button type="button" data-w="after" class="active">Days after salary</button>
+          <button type="button" data-w="dom">Day of month</button>
+        </div>
+      </div>
+    </div>
+    <div class="row" id="afterWhen">
+      <div class="field">
         <label>Days after salary</label>
         <input type="number" inputmode="numeric" id="pDay" placeholder="e.g. 5" min="0" max="31">
+        <div class="due-prev" id="duePrev"></div>
+      </div>
+    </div>
+    <div class="row" id="domWhen" style="display:none;">
+      <div class="field">
+        <label>Day of month</label>
+        <input type="number" inputmode="numeric" id="pDom" placeholder="e.g. 1" min="1" max="31">
+        <div class="due-prev" id="duePrevDom"></div>
       </div>
     </div>
     <div class="row" id="oneWhen" style="display:none;">
@@ -675,7 +735,7 @@
         <input type="date" id="pDate">
       </div>
     </div>
-    <label class="checkline" for="addAnother" style="margin-top:14px;">
+    <label class="checkline" for="addAnother" id="addAnotherWrap" style="margin-top:14px;">
       <input type="checkbox" id="addAnother">
       <span>Add another one after saving</span>
     </label>
@@ -805,12 +865,14 @@
     <div id="salaryPromptMsg" style="font-size:13px; color:var(--muted); line-height:1.5;"></div>
     <button class="btn" id="salaryPromptAdd">Add to balance</button>
     <button class="btn ghost" id="salaryPromptDismiss" style="margin-top:8px;">Not now</button>
+    <button class="btn ghost" id="salaryPromptSkip" style="margin-top:8px;">Skip this month</button>
   </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { initializeFirestore, doc, getDoc, setDoc, onSnapshot, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, doc, getDoc, setDoc, onSnapshot, arrayUnion, arrayRemove,
+         persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithCredential, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const GOOGLE_CLIENT_ID = "493144599667-9nan540q0v0k2tnm5f9a7l2mechq35ru.apps.googleusercontent.com";
@@ -826,7 +888,19 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 // Force long-polling — WebChannel (Firestore's default transport) is blocked by iOS Safari
 // tracking protection / some networks, which hangs sync on "Connecting…" indefinitely.
-const db = initializeFirestore(fbApp, { experimentalForceLongPolling: true });
+// The persistent (IndexedDB) cache lets onSnapshot paint real numbers before the network
+// answers. Private-mode Safari and locked-down browsers have no IndexedDB, so fall back
+// to the memory cache rather than failing to start at all.
+let db;
+try{
+  db = initializeFirestore(fbApp, {
+    experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+}catch(e){
+  console.warn('Persistent cache unavailable, using memory cache', e);
+  db = initializeFirestore(fbApp, { experimentalForceLongPolling: true });
+}
 const auth = getAuth(fbApp);
 const googleProvider = new GoogleAuthProvider();
 let currentUser = null;
@@ -834,7 +908,29 @@ onAuthStateChanged(auth, user => { currentUser = user; route(); });
 
 const $ = s => document.querySelector(s);
 const RATE_KEY = 'dailyBudgetRate';
+const LAST_KEY = 'dailyBudgetLast';
 const BUDGET_COLLECTION = 'budgets_v2';
+
+// ---------- Last-opened budget (local only) ----------
+// Kept in localStorage so the landing screen knows where to go with no network call at all.
+// Stamped with the uid so signing in as someone else never lands on a budget they can't read.
+function rememberLastBudget(id, name){
+  if(!currentUser) return;
+  try{ localStorage.setItem(LAST_KEY, JSON.stringify({ id, name, uid: currentUser.uid })); }catch(e){}
+}
+function lastBudget(){
+  try{
+    const r = JSON.parse(localStorage.getItem(LAST_KEY) || 'null');
+    if(!r || !r.id) return null;
+    if(currentUser && r.uid && r.uid !== currentUser.uid) return null;
+    return r;
+  }catch(e){ return null; }
+}
+function forgetLastBudget(id){
+  const r = lastBudget();
+  if(id && (!r || r.id !== id)) return;    // only forget the one we were asked about
+  try{ localStorage.removeItem(LAST_KEY); }catch(e){}
+}
 
 let budgetId = new URLSearchParams(location.search).get('id') || null;
 let budgetRef = null;
@@ -869,6 +965,8 @@ let state = {
 };
 let selectedCurrency = 'UAH';
 let addKind = 'regular';     // 'regular' | 'oneoff' — add-expense modal mode
+let addWhen = 'after';       // 'after' | 'dom' — how a regular payment is timed
+let editingId = null;        // id being edited in the expense modal, or null when adding
 let addCategory = null;      // selected category id in the add-expense picker
 let savAddCurrency = 'UAH';  // Add-to-savings currency
 let setSalaryCurrency = 'UAH';
@@ -914,13 +1012,29 @@ function showScreen(id){
 }
 
 let routing = false;
+// Auto-open happens once per page load, on the cold start only. After that the user has
+// navigated here deliberately (menu → My budgets, or Back), so we must not bounce them back in.
+let autoOpened = false;
 async function route(){
   if(routing) return; routing = true;
   try{
     if(!currentUser){ showScreen('signInScreen'); renderGsiButton(); return; }
     budgetId = new URLSearchParams(location.search).get('id');
-    if(budgetId){ await openBudget(budgetId); }
-    else { showLanding(); }
+    if(budgetId){ autoOpened = true; await openBudget(budgetId); return; }
+    const last = lastBudget();
+    if(last && !autoOpened){
+      // Open it directly rather than via goToBudget() — that re-enters route(), which the
+      // `routing` guard would swallow. replaceState, not pushState: the landing screen was
+      // never really shown, so Back shouldn't bounce straight back into the budget.
+      autoOpened = true;
+      const url = new URL(location.href);
+      url.searchParams.set('id', last.id);
+      history.replaceState(null, '', url);
+      budgetId = last.id;
+      openBudget(last.id);
+      return;
+    }
+    showLanding();
   } finally { routing = false; }
 }
 
@@ -928,6 +1042,20 @@ function showLanding(){
   if(unsubscribe){ unsubscribe(); unsubscribe = null; }
   showScreen('landingScreen');
   $('#landingWho').textContent = currentUser ? `Signed in as ${currentUser.email}` : '';
+  renderLastBudgetCard();
+}
+
+// The landing screen leads with the budget you were last in; Create / All budgets step back
+// to secondary. With nothing cached (a brand-new user) it's the original two-button screen.
+function renderLastBudgetCard(){
+  const card = $('#lastBudgetCard');
+  const last = lastBudget();
+  card.style.display = last ? 'flex' : 'none';
+  if(last){
+    card.dataset.id = last.id;
+    $('#lastBudgetName').textContent = last.name || 'Budget';
+  }
+  $('#createBudgetBtn').classList.toggle('secondary', !!last);
 }
 
 function goHome(){
@@ -990,6 +1118,7 @@ async function onGoogleCredential(response){
 
 async function doSignOut(){
   try{
+    forgetLastBudget();   // the next person to sign in starts at the landing screen
     if(unsubscribe){ unsubscribe(); unsubscribe = null; }
     if(window.google && window.google.accounts && window.google.accounts.id){
       window.google.accounts.id.disableAutoSelect();
@@ -1068,6 +1197,7 @@ async function removeBudgetFromList(id){
     if(!isOwned){
       try{ await setDoc(doc(db, BUDGET_COLLECTION, id), { members: arrayRemove(currentUser.uid) }, { merge: true }); }catch(e){}
     }
+    forgetLastBudget(id);
     showToast('Removed');
     renderMyBudgets();
   }catch(e){ showToast('Could not remove'); }
@@ -1094,57 +1224,80 @@ function applyRemoteDoc(data){
   $('#budgetTitle').textContent = budgetName;
 }
 
-async function openBudget(id){
+// One listener does the whole job. It used to await getDoc() and THEN attach onSnapshot,
+// which fetched the same document a second time — two full round-trips before any number
+// appeared. With the persistent cache on, the listener's first callback comes straight from
+// IndexedDB, so real figures paint immediately and the server quietly confirms after.
+function openBudget(id){
   budgetId = id;
   budgetRef = doc(db, BUDGET_COLLECTION, id);
   remoteReady = false;
   showScreen('budgetScreen');
-  setSyncNote('Connecting…');
 
-  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000));
-  let syncError = null, snap = null;
-  try{ snap = await Promise.race([getDoc(budgetRef), timeout]); }
-  catch(e){ syncError = e.message === 'timeout'
-      ? "Can't reach the server. Check your connection or disable content blockers."
-      : 'Could not load this budget'; }
-
-  if(snap && !snap.exists()){
-    showToast('Budget not found');
-    goHome();
-    return;
+  // Paint the cached name right away so the header isn't a placeholder while data arrives.
+  const cached = lastBudget();
+  if(cached && cached.id === id){
+    budgetName = cached.name || budgetName;
+    $('#budgetTitle').textContent = budgetName;
   }
-  if(snap && snap.exists()){
-    applyRemoteDoc(snap.data());
-    // Capture this user as a member + add to their budget list on first open.
-    try{
-      if(currentUser && !members.includes(currentUser.uid)){
-        await setDoc(budgetRef, {
-          members: arrayUnion(currentUser.uid),
-          memberEmails: { [currentUser.uid]: currentUser.email }
-        }, { merge: true });
-        members = [...members, currentUser.uid];
-      }
-      await setDoc(userRef(), { budgetIds: arrayUnion(budgetId) }, { merge: true });
-    }catch(e){}
-  }
+  setSyncNote('Updating…');
 
-  remoteReady = true;
-  if(canEdit()) maybeResetMonthlyPaid();
-  render();
-  applyAccessUI();
-  setSyncNote(syncError || 'Synced ✓');
-  if(!syncError) maybeShowSalaryPrompt();
+  if(unsubscribe){ unsubscribe(); unsubscribe = null; }
 
-  if(unsubscribe){ unsubscribe(); }
-  unsubscribe = onSnapshot(budgetRef, s => {
-    if(s.exists()){
-      applyRemoteDoc(s.data());
-      render();
-      applyAccessUI();
-      setSyncNote('Synced ✓');
-      if($('#statsModalBackdrop').style.display === 'flex') renderStatsChart();
+  let serverSeen = false;
+  const timer = setTimeout(() => {
+    if(!serverSeen) setSyncNote("Can't reach the server. Check your connection or disable content blockers.");
+  }, 12000);
+
+  unsubscribe = onSnapshot(budgetRef, { includeMetadataChanges: true }, snap => {
+    const fromCache = snap.metadata.fromCache;
+
+    if(!snap.exists()){
+      // A "missing" answer from cache just means we've never loaded it — wait for the server.
+      if(fromCache) return;
+      clearTimeout(timer);
+      forgetLastBudget(id);
+      showToast('Budget not found');
+      goHome();
+      return;
     }
-  }, err => { setSyncNote('Offline — showing last loaded data'); });
+
+    applyRemoteDoc(snap.data());
+    remoteReady = true;
+    rememberLastBudget(id, budgetName);
+
+    if(!fromCache && !serverSeen){
+      // Anything that writes back waits for confirmed server data, so a stale cached read
+      // can never trigger a spurious monthly reset or a duplicate salary prompt.
+      serverSeen = true;
+      clearTimeout(timer);
+      if(canEdit()) maybeResetMonthlyPaid();
+      registerMembership();
+      maybeShowSalaryPrompt();
+    }
+
+    render();
+    applyAccessUI();
+    setSyncNote(fromCache ? 'Updating…' : 'Synced ✓');
+    if($('#statsModalBackdrop').style.display === 'flex') renderStatsChart();
+  }, err => {
+    clearTimeout(timer);
+    setSyncNote('Offline — showing last loaded data');
+  });
+}
+
+// Capture this user as a member + add to their budget list on first open.
+async function registerMembership(){
+  try{
+    if(currentUser && !members.includes(currentUser.uid)){
+      await setDoc(budgetRef, {
+        members: arrayUnion(currentUser.uid),
+        memberEmails: { [currentUser.uid]: currentUser.email }
+      }, { merge: true });
+      members = [...members, currentUser.uid];
+    }
+    await setDoc(userRef(), { budgetIds: arrayUnion(budgetId) }, { merge: true });
+  }catch(e){}
 }
 
 async function renameBudget(){
@@ -1154,6 +1307,7 @@ async function renameBudget(){
   try{
     await setDoc(budgetRef, { name }, { merge: true });
     budgetName = name; $('#budgetTitle').textContent = name;
+    rememberLastBudget(budgetId, name);
     showToast('Renamed');
     closeModal($('#renameBackdrop'));
   }catch(e){ showToast('Could not rename'); }
@@ -1174,6 +1328,7 @@ async function leaveBudget(){
       await setDoc(budgetRef, { members: arrayRemove(currentUser.uid) }, { merge: true });
     }
   }catch(e){}
+  forgetLastBudget(budgetId);   // don't auto-open a budget the user just removed
   goHome();
 }
 
@@ -1206,8 +1361,10 @@ function applyAccessUI(){
   $('#pName').disabled = !editAllowed;
   $('#pAmount').disabled = !editAllowed;
   $('#pDay').disabled = !editAllowed;
+  $('#pDom').disabled = !editAllowed;
   $('#addBtn').disabled = !editAllowed;
   $('#currSeg').querySelectorAll('button').forEach(b => b.disabled = !editAllowed);
+  $('#whenSeg').querySelectorAll('button').forEach(b => b.disabled = !editAllowed);
   $('#menuAddPayment').style.display = editAllowed ? 'flex' : 'none';
   $('#menuSettings').style.display = editAllowed ? 'flex' : 'none';
   $('#savingsAddBtn').disabled = !editAllowed;
@@ -1278,10 +1435,34 @@ function lastSalaryDate(from){
   return candidate;
 }
 
+// A regular payment is timed one of two ways. Payments saved before day-of-month existed have
+// no dayMode, so they read as 'after' and behave exactly as they always did.
+//   'after' — N days after the salary landed (the original scheme)
+//   'dom'   — a fixed day of the month, resolved INSIDE the current salary cycle: a payment on
+//             the 1st, in a cycle running 15 Aug → 15 Sep, is due 1 Sep, not 1 Aug.
 function paymentDueDate(p, lastSalary){
+  if(p.dayMode === 'dom'){
+    const dom = Math.min(Math.max(Number(p.dom) || 1, 1), 31);
+    const mk = (y, m) => new Date(y, m, Math.min(dom, new Date(y, m + 1, 0).getDate()));
+    let d = mk(lastSalary.getFullYear(), lastSalary.getMonth());
+    if(d.getTime() < lastSalary.getTime()) d = mk(lastSalary.getFullYear(), lastSalary.getMonth() + 1);
+    return d;
+  }
   const d = new Date(lastSalary);
   d.setDate(d.getDate() + (Number(p.day)||0));
   return d;
+}
+
+function ord(n){
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// "5 days after salary" / "on the 1st" — how a regular payment's timing reads in a row.
+function paymentWhenLabel(p){
+  if(p.dayMode === 'dom') return `on the ${ord(Math.min(Math.max(Number(p.dom) || 1, 1), 31))}`;
+  const offset = Number(p.day) || 0;
+  return `${offset} day${offset === 1 ? '' : 's'} after salary`;
 }
 
 function daysBetween(a, b){
@@ -1444,7 +1625,9 @@ function render(){
     list.innerHTML = '<div class="empty">No payments yet</div>';
   } else {
     const lastSalary = lastSalaryDate(new Date());
-    const sorted = [...state.payments].sort((a,b) => (a.day||0) - (b.day||0));
+    // Sort by real due date — with two timing schemes in play, p.day no longer orders the list.
+    const sorted = [...state.payments].sort((a,b) =>
+      paymentDueDate(a, lastSalary) - paymentDueDate(b, lastSalary));
     const unpaid = sorted.filter(p => !p.paid);
     const paid = sorted.filter(p => p.paid);
     const rowHtml = p => paymentRowHtml(p, lastSalary);
@@ -1479,19 +1662,21 @@ function render(){
   }
 }
 
+// Faint pencil beside the name, so a row reads as tappable-to-edit.
+const PENCIL = '<span class="pen" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>';
+
 function paymentRowHtml(p, lastSalary){
   const usdLine = p.currency === 'USD' ? `<div class="usd">$${fmt(p.amountUSD)}</div>` : '';
   const eurLine = p.currency === 'EUR' ? `<div class="usd">€${fmt(p.amountEUR)}</div>` : '';
   const dueDate = paymentDueDate(p, lastSalary);
   const dueLabel = dueDate.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
-  const offset = Number(p.day) || 0;
   const chip = p.category ? catChipHtml(p.category) + ' ' : '';
   return `
   <div class="payment ${p.paid?'paid':''}" data-id="${escapeHtml(p.id)}">
     <div class="check" data-action="toggle">${p.paid?'✓':''}</div>
-    <div class="info">
-      <div class="name ${p.paid?'paid-strike':''}">${escapeHtml(p.name)}</div>
-      <div class="meta">${chip}${offset} day${offset===1?'':'s'} after salary · ${dueLabel}</div>
+    <div class="info" data-action="edit">
+      <div class="name ${p.paid?'paid-strike':''}">${escapeHtml(p.name)}${PENCIL}</div>
+      <div class="meta">${chip}${paymentWhenLabel(p)} · ${dueLabel}</div>
     </div>
     <div class="amt">
       <div class="uah">₴${fmt(p.amountUAH)}</div>
@@ -1536,8 +1721,8 @@ function oneoffRowHtml(o){
   return `
   <div class="payment ${o.paid?'paid':''} ${dim}" data-id="${escapeHtml(o.id)}">
     <div class="check" data-action="toggle">${o.paid?'✓':''}</div>
-    <div class="info">
-      <div class="name ${o.paid?'paid-strike':''}">${escapeHtml(o.name)}</div>
+    <div class="info" data-action="edit">
+      <div class="name ${o.paid?'paid-strike':''}">${escapeHtml(o.name)}${PENCIL}</div>
       <div class="meta">${chip}${dueLabel}${note}</div>
     </div>
     <div class="amt">
@@ -2005,21 +2190,50 @@ $('#addBtn').addEventListener('click', () => {
     amountUAH = amount;
   }
 
-  const base = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    name, currency: selectedCurrency, amountUSD, amountEUR, amountUAH,
-    category: addCategory || null, paid: false
-  };
-
+  // Timing fields, validated per kind. Writing both dayMode and dom (or nulling dom) keeps an
+  // edited payment from carrying a stale field from its previous scheme.
+  let timing;
   if(addKind === 'oneoff'){
     const dateVal = $('#pDate').value;
     if(!dateVal){ showToast('Pick a date'); return; }
-    state.oneoffs = state.oneoffs || [];
-    state.oneoffs.push({ ...base, date: dateVal });
+    timing = { date: dateVal };
+  } else if(addWhen === 'dom'){
+    const dom = parseInt($('#pDom').value, 10);
+    if(isNaN(dom) || dom < 1 || dom > 31){ showToast('Enter a day of the month (1-31)'); return; }
+    timing = { dayMode: 'dom', dom, day: 0 };
   } else {
     const day = parseInt($('#pDay').value, 10);
     if(isNaN(day) || day < 0 || day > 31){ showToast('Enter a valid number of days (0-31)'); return; }
-    state.payments.push({ ...base, day });
+    timing = { dayMode: 'after', day, dom: null };
+  }
+
+  const fields = {
+    name, currency: selectedCurrency, amountUSD, amountEUR, amountUAH,
+    category: addCategory || null, ...timing
+  };
+
+  if(editingId){
+    const list = addKind === 'oneoff' ? (state.oneoffs || []) : state.payments;
+    const item = list.find(x => x.id === editingId);
+    if(!item){ showToast('That expense no longer exists'); closeModal($('#addPaymentBackdrop')); editingId = null; return; }
+    Object.assign(item, fields);        // id and paid state are deliberately left alone
+    save();
+    render();
+    editingId = null;
+    closeModal($('#addPaymentBackdrop'));
+    showToast('Changes saved');
+    return;
+  }
+
+  const base = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    paid: false, ...fields
+  };
+  if(addKind === 'oneoff'){
+    state.oneoffs = state.oneoffs || [];
+    state.oneoffs.push(base);
+  } else {
+    state.payments.push(base);
   }
 
   save();
@@ -2028,6 +2242,8 @@ $('#addBtn').addEventListener('click', () => {
   $('#pName').value = '';
   $('#pAmount').value = '';
   $('#pDay').value = '';
+  $('#pDom').value = '';
+  updateDuePreview();
   showToast(addKind === 'oneoff' ? 'One-off added' : 'Payment added');
 
   if($('#addAnother').checked){
@@ -2060,6 +2276,8 @@ $('#paymentsList').addEventListener('click', async e => {
       save();
       render();
     }, delay);
+  } else if(action === 'edit'){
+    openEditExpense('regular', id);
   } else if(action === 'delete'){
     if(await askConfirm('Delete this payment?')){
       state.payments = state.payments.filter(p => p.id !== id);
@@ -2081,6 +2299,8 @@ $('#oneoffList').addEventListener('click', async e => {
     if(checkEl){ checkEl.classList.add(goingPaid ? 'checking' : 'unchecking'); if(goingPaid) checkEl.textContent = '✓'; }
     row.style.pointerEvents = 'none';
     setTimeout(() => { o.paid = !o.paid; save(); render(); }, reduceMotion ? 0 : (goingPaid ? 380 : 240));
+  } else if(action === 'edit'){
+    openEditExpense('oneoff', id);
   } else if(action === 'delete'){
     if(await askConfirm('Delete this one-off expense?')){
       state.oneoffs = (state.oneoffs || []).filter(o => o.id !== id);
@@ -2144,7 +2364,15 @@ $('#salaryPromptAdd').addEventListener('click', () => {
   closeModal($('#salaryPromptBackdrop'));
   showToast('Salary added');
 });
+// "Not now" leaves the cycle unmarked, so the prompt returns on the next open. "Skip this
+// month" marks it handled without touching the balance — the same flag "Add" sets.
 $('#salaryPromptDismiss').addEventListener('click', () => closeModal($('#salaryPromptBackdrop')));
+$('#salaryPromptSkip').addEventListener('click', () => {
+  state.salaryAddedCycle = $('#salaryPromptAdd').dataset.key || null;
+  save();
+  closeModal($('#salaryPromptBackdrop'));
+  showToast("Skipped — we won't ask again this month");
+});
 $('#salaryPromptBackdrop').addEventListener('click', e => { if(e.target === $('#salaryPromptBackdrop')) closeModal($('#salaryPromptBackdrop')); });
 
 $('#shareBtn').addEventListener('click', async () => {
@@ -2181,6 +2409,13 @@ $('#membersList').addEventListener('click', e => {
 
 // ---------- Screen buttons ----------
 $('#createBudgetBtn').addEventListener('click', createBudget);
+$('#lastBudgetCard').addEventListener('click', () => {
+  const id = $('#lastBudgetCard').dataset.id;
+  if(id) goToBudget(id);
+});
+$('#lastBudgetCard').addEventListener('keydown', e => {
+  if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); $('#lastBudgetCard').click(); }
+});
 $('#joinBudgetBtn').addEventListener('click', () => { showScreen('joinScreen'); renderMyBudgets(); });
 $('#landingSignOutBtn').addEventListener('click', doSignOut);
 $('#backToLandingBtn').addEventListener('click', showLanding);
@@ -2238,32 +2473,111 @@ $('#statsModalBackdrop').addEventListener('click', e => {
 
 function setAddKind(k){
   addKind = k;
+  const reg = k !== 'oneoff';
   $('#kindSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.k === k));
-  $('#regWhen').style.display = k === 'oneoff' ? 'none' : '';
-  $('#oneWhen').style.display = k === 'oneoff' ? '' : 'none';
+  $('#regWhen').style.display   = reg ? '' : 'none';
+  $('#afterWhen').style.display = (reg && addWhen === 'after') ? '' : 'none';
+  $('#domWhen').style.display   = (reg && addWhen === 'dom')   ? '' : 'none';
+  $('#oneWhen').style.display   = reg ? 'none' : '';
 }
+
+function setAddWhen(w){
+  addWhen = w;
+  $('#whenSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.w === w));
+  setAddKind(addKind);   // re-applies which timing row is visible
+  updateDuePreview();
+}
+
+// Show the date the entered timing actually resolves to, so "day 31" or "the 1st" isn't guesswork.
+function updateDuePreview(){
+  const lastSal = lastSalaryDate(new Date());
+  const label = p => 'Due this cycle: ' +
+    paymentDueDate(p, lastSal).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+
+  const days = parseInt($('#pDay').value, 10);
+  $('#duePrev').textContent = (isNaN(days) || days < 0 || days > 31)
+    ? '' : label({ dayMode:'after', day: days });
+
+  const dom = parseInt($('#pDom').value, 10);
+  $('#duePrevDom').textContent = (isNaN(dom) || dom < 1 || dom > 31)
+    ? '' : label({ dayMode:'dom', dom });
+}
+
 function openAddPayment(){
   if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
-  setAddKind('regular');
+  editingId = null;
+  $('#addExpenseTitle').textContent = 'Add expense';
+  $('#addBtn').textContent = 'Add expense';
+  $('#kindSeg').style.display = '';
+  $('#addAnotherWrap').style.display = '';
+  addKind = 'regular';
+  setAddWhen('after');
   addCategory = null;
   renderCatPick();
   selectedCurrency = 'UAH';
   $('#currSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.c === 'UAH'));
   $('#amtLabel').textContent = 'Amount (UAH)';
-  $('#pName').value = ''; $('#pAmount').value = ''; $('#pDay').value = '';
+  $('#pName').value = ''; $('#pAmount').value = ''; $('#pDay').value = ''; $('#pDom').value = '';
   if($('#pDate')) $('#pDate').value = new Date().toISOString().slice(0,10);
   $('#addAnother').checked = false;
+  updateDuePreview();
   openModal($('#addPaymentBackdrop'));
   setTimeout(() => $('#pName').focus(), 60);
 }
-$('#addPaymentClose').addEventListener('click', () => closeModal($('#addPaymentBackdrop')));
+
+// Same modal, edit mode: prefilled, saves in place, keeps the item's id and paid state.
+function openEditExpense(kind, id){
+  if(!canEdit()){ showToast('Read-only — ask the owner for edit access'); return; }
+  const item = kind === 'oneoff'
+    ? (state.oneoffs || []).find(o => o.id === id)
+    : state.payments.find(p => p.id === id);
+  if(!item) return;
+
+  editingId = id;
+  $('#addExpenseTitle').textContent = 'Edit expense';
+  $('#addBtn').textContent = 'Save changes';
+  $('#kindSeg').style.display = 'none';        // regular ↔ one-off stays a delete-and-re-add
+  $('#addAnotherWrap').style.display = 'none';
+
+  addKind = kind;
+  setAddWhen(item.dayMode === 'dom' ? 'dom' : 'after');
+
+  addCategory = item.category || null;
+  renderCatPick();
+
+  selectedCurrency = item.currency || 'UAH';
+  $('#currSeg').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.c === selectedCurrency));
+  $('#amtLabel').textContent = `Amount (${selectedCurrency})`;
+
+  // Show the amount in the currency it was entered in, not the converted UAH figure.
+  const entered = selectedCurrency === 'USD' ? item.amountUSD
+                : selectedCurrency === 'EUR' ? item.amountEUR
+                : item.amountUAH;
+  $('#pName').value = item.name || '';
+  $('#pAmount').value = (entered === null || entered === undefined) ? '' : String(entered);
+  $('#pDay').value = item.dayMode === 'dom' ? '' : (item.day === null || item.day === undefined ? '' : String(item.day));
+  $('#pDom').value = item.dayMode === 'dom' ? String(item.dom || '') : '';
+  if($('#pDate')) $('#pDate').value = item.date || new Date().toISOString().slice(0,10);
+
+  $('#addAnother').checked = false;
+  updateDuePreview();
+  openModal($('#addPaymentBackdrop'));
+}
+function closeAddPayment(){ editingId = null; closeModal($('#addPaymentBackdrop')); }
+$('#addPaymentClose').addEventListener('click', closeAddPayment);
 $('#addPaymentBackdrop').addEventListener('click', e => {
-  if(e.target === $('#addPaymentBackdrop')) closeModal($('#addPaymentBackdrop'));
+  if(e.target === $('#addPaymentBackdrop')) closeAddPayment();
 });
 $('#kindSeg').addEventListener('click', e => {
   const b = e.target.closest('button'); if(!b) return;
   setAddKind(b.dataset.k);
 });
+$('#whenSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  setAddWhen(b.dataset.w);
+});
+$('#pDay').addEventListener('input', updateDuePreview);
+$('#pDom').addEventListener('input', updateDuePreview);
 $('#catPick').addEventListener('click', async e => {
   const chip = e.target.closest('[data-cat]'); if(!chip) return;
   const id = chip.dataset.cat;
