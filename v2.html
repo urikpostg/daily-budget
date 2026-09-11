@@ -482,13 +482,6 @@
   .two-btn{ display:flex; gap:10px; margin-top:12px; }
   .two-btn .btn{ margin-top:0; }
 
-  .toggle-sw{ width:44px; height:26px; min-width:44px; border-radius:20px; background:var(--border); position:relative; cursor:pointer; transition:background .18s; border:none; padding:0; flex:0 0 auto; }
-  .toggle-sw.on{ background:var(--accent); }
-  .toggle-sw::after{ content:''; position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; transition:left .18s; box-shadow:0 1px 3px rgba(0,0,0,.3); }
-  .toggle-sw.on::after{ left:20px; }
-  .set-row{ display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
-  .set-row:last-child{ border-bottom:none; }
-  .set-row .st{ flex:1; min-width:0; } .set-row .st .t{ font-size:14px; font-weight:600; } .set-row .st .d{ font-size:12px; color:var(--muted); margin-top:2px; }
 
   .seg2{ display:flex; background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:2px; margin-bottom:12px; }
   .seg2 button{ flex:1; border:none; background:transparent; color:var(--muted); padding:9px 0; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
@@ -835,19 +828,6 @@
       <div class="rate-note" style="text-align:left; margin-top:8px;">On pay day the app asks whether to add this to “what's left”, converting to ₴ at that day's rate. Weekend pay days shift to Fri/Mon.</div>
     </div>
 
-    <div class="card" style="margin-bottom:12px;">
-      <h2>Notifications</h2>
-      <div class="set-row">
-        <div class="st"><div class="t">Payment overdue</div><div class="d">1 day after a due payment is still unchecked</div></div>
-        <button type="button" class="toggle-sw" id="setNotifyOverdue" aria-label="Toggle overdue reminders"></button>
-      </div>
-      <div class="set-row">
-        <div class="st"><div class="t">Salary day</div><div class="d">Reminder to update your balance</div></div>
-        <button type="button" class="toggle-sw" id="setNotifySalary" aria-label="Toggle salary reminders"></button>
-      </div>
-      <div class="rate-note" style="text-align:left; margin-top:6px;">Push delivery is coming soon — this saves your preference for now.</div>
-    </div>
-
     <div class="card">
       <h2>Categories</h2>
       <div class="cat-pick" id="catManage" style="margin-bottom:10px;"></div>
@@ -977,7 +957,7 @@ function isOwner(){ return !!(currentUser && ownerUid && currentUser.uid === own
 function isMember(){ return !!(currentUser && members.includes(currentUser.uid)); }
 function canEdit(){ return isOwner() || isMember(); }
 
-const DEFAULT_SETTINGS = { salaryDay: 15, salaryAmount: 0, salaryCurrency: 'UAH', notifyOverdue: false, notifySalary: false };
+const DEFAULT_SETTINGS = { salaryDay: 15, salaryAmount: 0, salaryCurrency: 'UAH' };
 const DEFAULT_CATEGORIES = [
   { id:'housing', name:'Housing', color:'#0a84ff' },
   { id:'utilities', name:'Utilities', color:'#22b39a' },
@@ -1923,8 +1903,6 @@ function openSettings(){
   $('#setSalaryAmount').value = s.salaryAmount ? String(s.salaryAmount) : '';
   setSalaryCurrency = s.salaryCurrency || 'UAH';
   $('#setSalaryCurr').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.c === setSalaryCurrency));
-  $('#setNotifyOverdue').classList.toggle('on', !!s.notifyOverdue);
-  $('#setNotifySalary').classList.toggle('on', !!s.notifySalary);
   $('#newCatName').value = '';
   renderCatManage();
   openModal($('#settingsBackdrop'));
@@ -1937,9 +1915,7 @@ function saveSettings(){
   state.settings = {
     salaryDay: day,
     salaryAmount: parseFloat($('#setSalaryAmount').value) || 0,
-    salaryCurrency: setSalaryCurrency,
-    notifyOverdue: $('#setNotifyOverdue').classList.contains('on'),
-    notifySalary: $('#setNotifySalary').classList.contains('on')
+    salaryCurrency: setSalaryCurrency
   };
   save();
   render();     // pay-day change can move dates
@@ -2421,8 +2397,6 @@ $('#setSalaryCurr').addEventListener('click', e => {
   setSalaryCurrency = b.dataset.c;
   [...$('#setSalaryCurr').children].forEach(x => x.classList.toggle('active', x === b));
 });
-$('#setNotifyOverdue').addEventListener('click', () => $('#setNotifyOverdue').classList.toggle('on'));
-$('#setNotifySalary').addEventListener('click', () => $('#setNotifySalary').classList.toggle('on'));
 $('#addCatBtn').addEventListener('click', () => {
   const name = $('#newCatName').value.trim();
   if(!name){ showToast('Enter a category name'); return; }
