@@ -496,7 +496,7 @@ function slotHTML(when, d, k){
   var body = ls.length
     ? '<div class="meals">' + ls.map(esc).join('<span class="sep">·</span>') + '</div>'
     : '<div class="none"><span class="tick">✓</span> нічого готувати</div>';
-  var nt = (ls.length && note) ? '<div class="note">' + esc(note) + '</div>' : '';
+  var nt = note ? '<div class="note">' + esc(note) + '</div>' : '';
   return '<div class="slot"><div class="when">' + when + '<span class="d">' + dateLine + '</span></div>'
        + body + nt + '</div>';
 }
@@ -570,11 +570,10 @@ function dayHTML(d){
          + '" aria-pressed="' + on + '">' + m.label + '</button>';
   }).join('');
 
-  var note = (marks.length || noteOf(k)) ? noteLineHTML(k) : '';
   return '<div class="' + cls + '" data-day="' + k + '">'
        + '<div class="day-head"><span class="dow">' + DOW_FULL[dowIdx(d)] + '</span>'
        + '<span class="date">' + fmtShort(d) + '</span>' + tag + '</div>'
-       + '<div class="chips">' + chips + '</div>' + note + '</div>';
+       + '<div class="chips">' + chips + '</div>' + noteLineHTML(k) + '</div>';
 }
 function renderWeek(dir){
   var el = $('days'), out = '';
@@ -603,15 +602,13 @@ function toggleMeal(k, id){
   save();
   return ordered.indexOf(id) >= 0;
 }
-/* нотатка з’являється/зникає разом з позначками — перемальовуємо лише цей рядок */
+/* перемальовуємо лише рядок нотатки, не чіпаючи чіпи */
 function refreshDayCard(k){
   var card = document.querySelector('.day[data-day="' + k + '"]');
   if(!card) return;
-  var want = marksOf(k).length || noteOf(k);
   var line = card.querySelector('.note-line');
-  if(want && !line) card.insertAdjacentHTML('beforeend', noteLineHTML(k));
-  else if(!want && line) line.remove();
-  else if(line) line.outerHTML = noteLineHTML(k);
+  if(line) line.outerHTML = noteLineHTML(k);
+  else card.insertAdjacentHTML('beforeend', noteLineHTML(k));
 }
 $('days').addEventListener('click', function(e){
   if(suppressClick){ suppressClick = false; return; }   /* це був свайп, не дотик */
@@ -712,8 +709,10 @@ $('repeatBtn').addEventListener('click', function(){
   save(); renderWeek(); renderHero(); toast('Скопійовано з минулого тижня');
 });
 $('clearBtn').addEventListener('click', function(){
-  if(weekCount() === 0){ toast('Тиждень і так порожній'); return; }
-  if(!confirm('Прибрати всі позначки цього тижня?')) return;
+  var notes = 0;
+  for(var j = 0; j < daysInWeek(); j++) if(noteOf(key(addDays(monday, j)))) notes++;
+  if(weekCount() === 0 && !notes){ toast('Тиждень і так порожній'); return; }
+  if(!confirm('Прибрати всі позначки й нотатки цього тижня?')) return;
   for(var i = 0; i < daysInWeek(); i++){
     var k = key(addDays(monday, i));
     delete S.days[k]; delete S.notes[k];
@@ -723,10 +722,10 @@ $('clearBtn').addEventListener('click', function(){
 function weekText(){
   var head = ((S.child || '').trim() || 'Тиждень') + ' · ' + weekRangeText(), lines = [];
   for(var i = 0; i < daysInWeek(); i++){
-    var d = addDays(monday, i), k = key(d), ls = labelsOf(k);
-    if(!ls.length) continue;
-    var n = noteOf(k);
-    lines.push(DOW_SHORT[dowIdx(d)] + ' ' + fmtShort(d) + ' — ' + ls.join(', ') + (n ? ' (' + n + ')' : ''));
+    var d = addDays(monday, i), k = key(d), ls = labelsOf(k), n = noteOf(k);
+    if(!ls.length && !n) continue;
+    var tail = ls.length ? ls.join(', ') + (n ? ' (' + n + ')' : '') : n;
+    lines.push(DOW_SHORT[dowIdx(d)] + ' ' + fmtShort(d) + ' — ' + tail);
   }
   return head + '\n' + (lines.length ? lines.join('\n') : 'Нічого готувати');
 }
