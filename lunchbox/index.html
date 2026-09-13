@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ланчбокс">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0d10">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<title>Ланчбокс</title>
+<style>
+  :root{
+    --bg:#0b0d10;
+    --card:#16191d;
+    --card2:#1d2126;
+    --text:#f2f3f5;
+    --muted:#8b929c;
+    --accent:#ff9f0a;        /* "готуємо вдома" */
+    --on-accent:#241500;
+    --accent2:#0a84ff;
+    --ok:#34c759;
+    --danger:#ff453a;
+    --border:#2a2e34;
+    --ease-out:cubic-bezier(.22,.61,.36,1);
+    --dur:.26s;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f2f2f7;
+      --card:#ffffff;
+      --card2:#f7f7fa;
+      --text:#1c1c1e;
+      --muted:#6e6e73;
+      --border:#e5e5ea;
+      --accent:#f59300;
+    }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  [hidden]{display:none !important;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+    padding-bottom:calc(40px + env(safe-area-inset-bottom));
+    min-height:100vh;
+  }
+  /* While a sheet is open the page behind must not move. overflow:hidden alone doesn't hold
+     on iOS Safari, so the body is pinned and its scroll offset restored on close. */
+  body.modal-open{ position:fixed; left:0; right:0; width:100%; overflow:hidden; }
+
+  header{
+    padding:calc(20px + env(safe-area-inset-top)) 20px 12px;
+    position:sticky; top:0; z-index:10; background:var(--bg);
+  }
+  .header-row{ display:flex; align-items:center; gap:12px; max-width:520px; margin:0 auto; }
+  header h1{ font-size:22px; margin:0; font-weight:700; letter-spacing:-.01em; }
+  header .sub{ color:var(--muted); font-size:13px; margin-top:2px; }
+  .header-row .grow{ flex:1; min-width:0; }
+  .icon-btn{
+    width:40px; height:40px; min-width:40px; border-radius:12px;
+    background:var(--card2); border:1px solid var(--border); color:var(--text);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .icon-btn:active{ opacity:.7; }
+  .icon-btn svg{ width:20px; height:20px; display:block; }
+  main{ padding:0 16px; max-width:520px; margin:0 auto; }
+
+  /* ---- hero: what has to be cooked today / tomorrow ---- */
+  .hero{
+    background:linear-gradient(160deg,var(--card),var(--card2));
+    border:1px solid var(--border);
+    border-radius:20px; padding:6px 18px; margin-bottom:16px;
+  }
+  .hero .slot{ padding:14px 0; }
+  .hero .slot + .slot{ border-top:1px solid var(--border); }
+  .hero .when{
+    font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); display:flex; align-items:baseline; gap:7px;
+  }
+  .hero .when .d{ font-weight:600; letter-spacing:.02em; text-transform:none; font-size:12px; opacity:.85; }
+  .hero .meals{
+    font-size:19px; font-weight:700; margin-top:6px; line-height:1.35; letter-spacing:-.01em;
+    overflow-wrap:anywhere;
+  }
+  .hero .meals .sep{ color:var(--muted); font-weight:400; padding:0 7px; }
+  .hero .none{ font-size:15.5px; font-weight:600; color:var(--muted); margin-top:6px; }
+  .hero .none .tick{ color:var(--ok); font-weight:800; }
+  .hero .note{ font-size:13.5px; color:var(--muted); margin-top:5px; overflow-wrap:anywhere; }
+
+  /* ---- week switcher ---- */
+  .weeknav{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .weeknav .arrow{
+    width:38px; height:38px; min-width:38px; border-radius:11px;
+    background:var(--card); border:1px solid var(--border); color:var(--text);
+    font-size:17px; line-height:1; cursor:pointer; padding:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .weeknav .arrow:active{ opacity:.7; }
+  .weeknav .label{
+    flex:1; min-width:0; height:38px; border-radius:11px; cursor:pointer;
+    background:var(--card); border:1px solid var(--border); color:var(--text);
+    font-size:14.5px; font-weight:700; padding:0 10px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  }
+  .weeknav .label:active{ opacity:.8; }
+  .weeknav .label .cnt{ font-size:10.5px; font-weight:600; color:var(--muted); letter-spacing:.02em; }
+  .weeknav .label.away .cnt{ color:var(--accent2); }
+
+  .hintbar{
+    display:flex; align-items:center; gap:10px; margin-bottom:12px;
+    background:var(--card2); border:1px dashed var(--border); border-radius:13px; padding:10px 12px;
+  }
+  .hintbar span{ flex:1; min-width:0; font-size:13px; color:var(--muted); }
+  .hintbar button{
+    border:none; background:var(--accent); color:var(--on-accent);
+    font-size:13px; font-weight:700; border-radius:9px; padding:8px 12px; cursor:pointer;
+  }
+  .hintbar button:active{ opacity:.8; }
+
+  /* ---- day cards ---- */
+  #days{ touch-action:pan-y; }
+  #days.slide-l{ animation:sl .22s var(--ease-out); }
+  #days.slide-r{ animation:sr .22s var(--ease-out); }
+  @keyframes sl{ from{ opacity:0; transform:translateX(18px);} to{ opacity:1; transform:none;} }
+  @keyframes sr{ from{ opacity:0; transform:translateX(-18px);} to{ opacity:1; transform:none;} }
+
+  .day{
+    background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:12px 14px 13px; margin-bottom:10px;
+  }
+  .day.past{ opacity:.5; }
+  .day.today{ border-color:var(--accent); background:linear-gradient(160deg,var(--card),var(--card2)); }
+  .day-head{ display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
+  .day-head .dow{ font-size:15px; font-weight:700; }
+  .day-head .date{ font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .day-head .tag{
+    font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--accent); margin-left:auto;
+  }
+  .day-head .tag.dim{ color:var(--muted); }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{
+    border:1px solid var(--border); background:var(--card2); color:var(--muted);
+    border-radius:999px; padding:9px 13px; font-size:13.5px; font-weight:600;
+    cursor:pointer; transition:transform .12s var(--ease-out), background .14s ease, color .14s ease;
+  }
+  .chip.on{ background:var(--accent); border-color:transparent; color:var(--on-accent); font-weight:700; }
+  .chip:active{ transform:scale(.94); }
+  .chip.pop{ animation:pop .22s var(--ease-out); }
+  @keyframes pop{ 0%{transform:scale(.9);} 55%{transform:scale(1.07);} 100%{transform:scale(1);} }
+
+  .note-line{
+    display:block; width:100%; text-align:left; margin-top:10px; padding:0;
+    background:none; border:none; cursor:pointer;
+    font-size:13px; color:var(--muted); overflow-wrap:anywhere;
+  }
+  .note-line:active{ opacity:.6; }
+  .note-line .has{ color:var(--text); }
+
+  /* ---- week actions ---- */
+  .acts{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
+  .acts button{
+    background:var(--card); border:1px solid var(--border); color:var(--text);
+    border-radius:13px; padding:11px 6px; font-size:12px; font-weight:600; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:6px; line-height:1.25;
+  }
+  .acts button:active{ opacity:.7; }
+  .acts button svg{ width:18px; height:18px; color:var(--muted); }
+
+  /* ---- sheets ---- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.5);
+    display:flex; align-items:flex-end; justify-content:center; z-index:200;
+    opacity:0; transition:opacity var(--dur) ease;
+  }
+  .modal-backdrop.show{ opacity:1; }
+  .modal-sheet{
+    background:var(--card); width:100%; max-width:520px;
+    border-radius:20px 20px 0 0;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom));
+    /* dvh tracks the visible viewport; iOS reports vh as the toolbar-hidden height, which
+       makes the sheet taller than the screen and hides its bottom rows. vh stays as fallback. */
+    max-height:85vh; max-height:85dvh;
+    overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+    transform:translateY(100%); transition:transform var(--dur) var(--ease-out);
+  }
+  .modal-backdrop.show .modal-sheet{ transform:none; }
+  .modal-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .modal-header h2{ margin:0; font-size:16px; font-weight:700; }
+  .modal-close{
+    background:var(--card2); border:none; border-radius:50%;
+    width:30px; height:30px; min-width:30px; color:var(--text); font-size:15px;
+    display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
+  }
+  label{ font-size:13px; color:var(--muted); display:block; margin-bottom:5px; }
+  input[type=text], textarea{
+    width:100%; background:var(--card2); border:1px solid var(--border); border-radius:10px;
+    padding:10px 12px; font-size:16px; color:var(--text); outline:none; font-family:inherit;
+  }
+  input[type=text]:focus, textarea:focus{ border-color:var(--accent2); }
+  textarea{ resize:none; }
+  .btn{
+    display:block; width:100%; border:none; border-radius:12px; padding:13px;
+    font-size:16px; font-weight:700; background:var(--accent2); color:#fff;
+    margin-top:12px; cursor:pointer;
+  }
+  .btn:active{ opacity:.8; }
+  .btn.secondary{ background:var(--card2); color:var(--text); border:1px solid var(--border); }
+  .btn.danger{ background:transparent; color:var(--danger); border:1px solid var(--border); }
+  .set-row{
+    display:flex; align-items:center; gap:12px; padding:13px 0;
+    border-top:1px solid var(--border);
+  }
+  .set-row:first-of-type{ border-top:none; }
+  .set-row .t{ flex:1; min-width:0; }
+  .set-row .t b{ font-size:15px; font-weight:600; display:block; }
+  .set-row .t small{ font-size:12.5px; color:var(--muted); }
+  .set-row.tap{ cursor:pointer; }
+  .set-row.tap:active{ opacity:.6; }
+  .set-row .chev{ color:var(--muted); font-size:14px; }
+  .switch{ width:50px; height:30px; min-width:50px; border-radius:15px; border:none; padding:0;
+    background:var(--border); position:relative; cursor:pointer; transition:background .18s ease; }
+  .switch::after{
+    content:''; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%;
+    background:#fff; transition:transform .18s var(--ease-out); box-shadow:0 1px 3px rgba(0,0,0,.3);
+  }
+  .switch.on{ background:var(--ok); }
+  .switch.on::after{ transform:translateX(20px); }
+
+  .tpl-day{ padding:12px 0; border-top:1px solid var(--border); }
+  .tpl-day:first-child{ border-top:none; padding-top:0; }
+  .tpl-day .n{ font-size:13px; font-weight:700; color:var(--muted); margin-bottom:8px; }
+  .sheet-note{ font-size:12.5px; color:var(--muted); line-height:1.45; margin:2px 0 0; }
+
+  .toast{
+    position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translate(-50%,14px); z-index:300;
+    background:var(--card2); border:1px solid var(--border); color:var(--text);
+    border-radius:12px; padding:11px 16px; font-size:14px; font-weight:600;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+    opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s var(--ease-out);
+  }
+  .toast.show{ opacity:1; transform:translate(-50%,0); }
+
+  @media (prefers-reduced-motion: reduce){
+    .modal-backdrop, .modal-sheet, .chip, .switch, .switch::after, .toast{ transition-duration:.001s !important; }
+    #days.slide-l, #days.slide-r, .chip.pop{ animation-duration:.001s !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div class="grow">
+      <h1>Ланчбокс</h1>
+      <div class="sub" id="sub">що готуємо вдома</div>
+    </div>
+    <button class="icon-btn" id="settingsBtn" aria-label="Налаштування">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="hero" id="hero"></section>
+
+  <div class="weeknav">
+    <button class="arrow" id="prevWeek" aria-label="Попередній тиждень">‹</button>
+    <button class="label" id="weekLabel"></button>
+    <button class="arrow" id="nextWeek" aria-label="Наступний тиждень">›</button>
+  </div>
+
+  <div id="hintSlot"></div>
+  <div id="days"></div>
+
+  <div class="acts">
+    <button id="repeatBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>
+        <path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
+      </svg>
+      Минулий тиждень
+    </button>
+    <button id="shareBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 16V3"/><path d="M8 7l4-4 4 4"/>
+        <path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>
+      </svg>
+      Поділитися
+    </button>
+    <button id="clearBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      </svg>
+      Очистити тиждень
+    </button>
+  </div>
+</main>
+
+<!-- note for one day -->
+<div class="modal-backdrop" id="noteModal" hidden>
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2 id="noteTitle">Нотатка</h2>
+      <button class="modal-close" data-close aria-label="Закрити">✕</button>
+    </div>
+    <label for="noteText">Що саме приготувати / не забути</label>
+    <textarea id="noteText" rows="3" placeholder="сирники, яблуко, пляшка води"></textarea>
+    <button class="btn" id="noteSave">Зберегти</button>
+    <button class="btn secondary" id="noteDel">Видалити нотатку</button>
+  </div>
+</div>
+
+<!-- settings -->
+<div class="modal-backdrop" id="setModal" hidden>
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>Налаштування</h2>
+      <button class="modal-close" data-close aria-label="Закрити">✕</button>
+    </div>
+
+    <label for="childName">Ім’я дитини</label>
+    <input type="text" id="childName" placeholder="Артур" autocomplete="off">
+
+    <div style="height:6px"></div>
+    <div class="set-row">
+      <div class="t"><b>Показувати вихідні</b><small>субота і неділя у тижні</small></div>
+      <button class="switch" id="weekendSw" role="switch" aria-label="Показувати вихідні"></button>
+    </div>
+    <div class="set-row tap" id="openTemplate">
+      <div class="t"><b>Щотижневий розклад</b><small id="tplSum">Постійні дні, які готуєте самі</small></div>
+      <span class="chev">›</span>
+    </div>
+
+    <label style="margin-top:14px">Прийоми їжі</label>
+    <div class="chips" id="mealPick"></div>
+    <p class="sheet-note">Вимкнені тут прийоми їжі просто не показуються у тижні.</p>
+
+    <button class="btn secondary" id="exportBtn">Резервна копія (копіювати)</button>
+    <button class="btn secondary" id="importBtn">Відновити з копії</button>
+    <button class="btn danger" id="wipeBtn">Стерти всі дані</button>
+    <p class="sheet-note" style="margin-top:12px">Дані зберігаються лише на цьому пристрої.</p>
+  </div>
+</div>
+
+<!-- weekly template -->
+<div class="modal-backdrop" id="tplModal" hidden>
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>Щотижневий розклад</h2>
+      <button class="modal-close" data-close aria-label="Закрити">✕</button>
+    </div>
+    <p class="sheet-note" style="margin-bottom:12px">
+      Позначте те, що готуєте самі щотижня. Порожній тиждень можна буде заповнити цим розкладом одним дотиком.
+    </p>
+    <div id="tplDays"></div>
+    <button class="btn" id="tplApply">Застосувати до цього тижня</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ----------------------------------------------------------------------------
+   Що це: список прийомів їжі, які мама готує вдома й приносить у школу.
+   Позначений (помаранчевий) чіп = цього дня цю їжу треба приготувати самим.
+   Усе зберігається локально, у localStorage — сервера немає.
+---------------------------------------------------------------------------- */
+
+var MEALS = [
+  {id:'snidanok',    label:'сніданок'},
+  {id:'perekus',     label:'перекус'},
+  {id:'obid',        label:'обід'},
+  {id:'pidvechirok', label:'підвечірок'},
+  {id:'vecherya',    label:'вечеря'}
+];
+var DOW_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+var DOW_FULL  = ['понеділок','вівторок','середа','четвер','п’ятниця','субота','неділя'];
+var MONTH_GEN = ['січня','лютого','березня','квітня','травня','червня','липня',
+                 'серпня','вересня','жовтня','листопада','грудня'];
+var LS = 'lunchbox.v1';
+
+var DEFAULTS = {child:'Артур', showWeekend:false, meals:MEALS.map(function(m){return m.id;}),
+                days:{}, notes:{}, template:{}};
+
+/* ---------- state ---------- */
+function fresh(){ return JSON.parse(JSON.stringify(DEFAULTS)); }
+function load(){
+  try{
+    var raw = localStorage.getItem(LS);
+    if(!raw) return fresh();
+    var p = JSON.parse(raw), s = fresh();
+    if(typeof p.child === 'string') s.child = p.child;
+    s.showWeekend = !!p.showWeekend;
+    if(Array.isArray(p.meals) && p.meals.length) s.meals = p.meals.filter(isMeal);
+    if(!s.meals.length) s.meals = DEFAULTS.meals.slice();
+    if(p.days && typeof p.days === 'object') s.days = p.days;
+    if(p.notes && typeof p.notes === 'object') s.notes = p.notes;
+    if(p.template && typeof p.template === 'object') s.template = p.template;
+    return s;
+  }catch(e){ return fresh(); }
+}
+function isMeal(id){ return MEALS.some(function(m){ return m.id === id; }); }
+function save(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }
+var S = load();
+
+/* ---------- dates (усе в локальному часі, без UTC-зсувів) ---------- */
+function pad(n){ return n < 10 ? '0'+n : ''+n; }
+function key(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function parseKey(k){ var p = k.split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+function addDays(d, n){ var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
+function dowIdx(d){ return (d.getDay()+6) % 7; }            /* 0 = понеділок */
+function startOfWeek(d){ return addDays(d, -dowIdx(d)); }
+function today(){ var n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+function fmtShort(d){ return pad(d.getDate())+'.'+pad(d.getMonth()+1); }
+
+/* У суботу/неділю (коли вихідні не показуються) корисніший уже наступний
+   навчальний тиждень — саме на нього припадає «завтра». */
+function defaultMonday(){
+  var t = today();
+  if(!S.showWeekend && dowIdx(t) >= 5) return startOfWeek(addDays(t, 7));
+  return startOfWeek(t);
+}
+var monday = defaultMonday();
+var lastTodayKey = key(today());
+
+/* ---------- helpers ---------- */
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function activeMeals(){ return MEALS.filter(function(m){ return S.meals.indexOf(m.id) >= 0; }); }
+/* позначки дня, без вимкнених у налаштуваннях прийомів їжі */
+function marksOf(k){
+  var a = S.days[k] || [];
+  return MEALS.filter(function(m){ return a.indexOf(m.id) >= 0 && S.meals.indexOf(m.id) >= 0; })
+              .map(function(m){ return m.id; });
+}
+function labelsOf(k){
+  var ids = marksOf(k);
+  return MEALS.filter(function(m){ return ids.indexOf(m.id) >= 0; }).map(function(m){ return m.label; });
+}
+function noteOf(k){ return (S.notes[k] || '').trim(); }
+function daysInWeek(){ return S.showWeekend ? 7 : 5; }
+function plural(n, one, few, many){
+  var a = n % 10, b = n % 100;
+  if(a === 1 && b !== 11) return one;
+  if(a >= 2 && a <= 4 && (b < 12 || b > 14)) return few;
+  return many;
+}
+var $ = function(id){ return document.getElementById(id); };
+
+var toastT;
+function toast(msg){
+  var el = $('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(function(){ el.classList.remove('show'); }, 2200);
+}
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise(function(res, rej){
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly',''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try{ ok = document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+    ok ? res() : rej();
+  });
+}
+function haptic(){ if(navigator.vibrate) try{ navigator.vibrate(8); }catch(e){} }
+
+/* ---------- hero: сьогодні / завтра ---------- */
+function slotHTML(when, d, k){
+  var ls = labelsOf(k), note = noteOf(k);
+  var dateLine = DOW_FULL[dowIdx(d)] + ', ' + fmtShort(d);
+  var body = ls.length
+    ? '<div class="meals">' + ls.map(esc).join('<span class="sep">·</span>') + '</div>'
+    : '<div class="none"><span class="tick">✓</span> нічого готувати</div>';
+  var nt = (ls.length && note) ? '<div class="note">' + esc(note) + '</div>' : '';
+  return '<div class="slot"><div class="when">' + when + '<span class="d">' + dateLine + '</span></div>'
+       + body + nt + '</div>';
+}
+function nextMarked(from, span){
+  for(var i = 0; i < span; i++){
+    var d = addDays(from, i);
+    if(labelsOf(key(d)).length) return d;
+  }
+  return null;
+}
+function renderHero(){
+  var t = today(), tm = addDays(t, 1);
+  var html = slotHTML('сьогодні', t, key(t)) + slotHTML('завтра', tm, key(tm));
+  /* коли найближчі два дні порожні — показуємо, коли доведеться готувати наступного разу */
+  if(!labelsOf(key(t)).length && !labelsOf(key(tm)).length){
+    var nx = nextMarked(addDays(t, 2), 21);
+    if(nx) html += slotHTML('далі', nx, key(nx));
+  }
+  $('hero').innerHTML = html;
+}
+
+/* ---------- week ---------- */
+function weekRangeText(){
+  var a = monday, b = addDays(monday, daysInWeek()-1);
+  if(a.getMonth() === b.getMonth()) return a.getDate() + '–' + b.getDate() + ' ' + MONTH_GEN[a.getMonth()];
+  return a.getDate() + ' ' + MONTH_GEN[a.getMonth()] + ' – ' + b.getDate() + ' ' + MONTH_GEN[b.getMonth()];
+}
+function weekCount(){
+  var n = 0;
+  for(var i = 0; i < daysInWeek(); i++) n += marksOf(key(addDays(monday, i))).length;
+  return n;
+}
+function isCurrentWeek(){ return key(monday) === key(defaultMonday()); }
+function renderWeekLabel(){
+  var el = $('weekLabel'), away = !isCurrentWeek(), n = weekCount();
+  el.classList.toggle('away', away);
+  var cnt = away ? '↩ до поточного тижня'
+                 : (n ? n + ' ' + plural(n, 'страва', 'страви', 'страв') + ' з дому' : 'нічого готувати');
+  el.innerHTML = '<span>' + esc(weekRangeText()) + '</span><span class="cnt">' + esc(cnt) + '</span>';
+}
+function templateCount(){
+  var n = 0;
+  for(var i = 0; i < 7; i++) n += (S.template[i] || []).length;
+  return n;
+}
+function renderHint(){
+  var slot = $('hintSlot');
+  if(weekCount() === 0 && templateCount() > 0){
+    slot.innerHTML = '<div class="hintbar"><span>Тиждень порожній</span>'
+                   + '<button type="button" id="applyTplBtn">Заповнити за розкладом</button></div>';
+  }else{
+    slot.innerHTML = '';
+  }
+}
+function noteLineHTML(k){
+  var note = noteOf(k);
+  return '<button class="note-line" type="button" data-note="' + k + '">'
+       + (note ? '<span class="has">✎ ' + esc(note) + '</span>' : '＋ нотатка')
+       + '</button>';
+}
+function dayHTML(d){
+  var k = key(d), marks = marksOf(k), tk = key(today()), tmk = key(addDays(today(), 1));
+  var cls = 'day', tag = '';
+  if(k === tk){ cls += ' today'; tag = '<span class="tag">сьогодні</span>'; }
+  else if(k === tmk){ tag = '<span class="tag dim">завтра</span>'; }
+  else if(k < tk){ cls += ' past'; }
+
+  var chips = activeMeals().map(function(m){
+    var on = marks.indexOf(m.id) >= 0;
+    return '<button class="chip' + (on ? ' on' : '') + '" type="button" data-k="' + k + '" data-m="' + m.id
+         + '" aria-pressed="' + on + '">' + m.label + '</button>';
+  }).join('');
+
+  var note = (marks.length || noteOf(k)) ? noteLineHTML(k) : '';
+  return '<div class="' + cls + '" data-day="' + k + '">'
+       + '<div class="day-head"><span class="dow">' + DOW_FULL[dowIdx(d)] + '</span>'
+       + '<span class="date">' + fmtShort(d) + '</span>' + tag + '</div>'
+       + '<div class="chips">' + chips + '</div>' + note + '</div>';
+}
+function renderWeek(dir){
+  var el = $('days'), out = '';
+  for(var i = 0; i < daysInWeek(); i++) out += dayHTML(addDays(monday, i));
+  el.innerHTML = out;
+  if(dir){
+    el.classList.remove('slide-l','slide-r');
+    void el.offsetWidth;                          /* перезапустити анімацію */
+    el.classList.add(dir > 0 ? 'slide-l' : 'slide-r');
+  }
+  renderWeekLabel(); renderHint();
+}
+function renderAll(){ renderHero(); renderWeek(); renderSub(); }
+function renderSub(){
+  var c = (S.child || '').trim();
+  $('sub').textContent = c ? c + ' · що готуємо вдома' : 'що готуємо вдома';
+}
+function shiftWeek(n){ monday = addDays(monday, n*7); renderWeek(n); }
+
+/* ---------- позначення страв ---------- */
+function toggleMeal(k, id){
+  var cur = (S.days[k] || []).slice(), i = cur.indexOf(id);
+  if(i >= 0) cur.splice(i, 1); else cur.push(id);
+  var ordered = MEALS.filter(function(m){ return cur.indexOf(m.id) >= 0; }).map(function(m){ return m.id; });
+  if(ordered.length) S.days[k] = ordered; else delete S.days[k];
+  save();
+  return ordered.indexOf(id) >= 0;
+}
+/* нотатка з’являється/зникає разом з позначками — перемальовуємо лише цей рядок */
+function refreshDayCard(k){
+  var card = document.querySelector('.day[data-day="' + k + '"]');
+  if(!card) return;
+  var want = marksOf(k).length || noteOf(k);
+  var line = card.querySelector('.note-line');
+  if(want && !line) card.insertAdjacentHTML('beforeend', noteLineHTML(k));
+  else if(!want && line) line.remove();
+  else if(line) line.outerHTML = noteLineHTML(k);
+}
+$('days').addEventListener('click', function(e){
+  if(suppressClick){ suppressClick = false; return; }   /* це був свайп, не дотик */
+  var chip = e.target.closest('.chip');
+  if(chip){
+    var on = toggleMeal(chip.dataset.k, chip.dataset.m);
+    chip.classList.toggle('on', on);
+    chip.setAttribute('aria-pressed', on);
+    chip.classList.remove('pop'); void chip.offsetWidth; chip.classList.add('pop');
+    refreshDayCard(chip.dataset.k);
+    renderHero(); renderWeekLabel(); renderHint();
+    haptic();
+    return;
+  }
+  var nl = e.target.closest('.note-line');
+  if(nl) openNote(nl.dataset.note);
+});
+
+/* ---------- sheets ---------- */
+var openCount = 0, pinnedY = 0;
+function openSheet(el){
+  el.hidden = false;
+  if(openCount === 0){
+    pinnedY = window.scrollY;
+    document.body.style.top = '-' + pinnedY + 'px';
+    document.body.classList.add('modal-open');
+  }
+  openCount++;
+  requestAnimationFrame(function(){ el.classList.add('show'); });
+}
+function closeSheet(el){
+  if(el.hidden) return;
+  el.classList.remove('show');
+  openCount = Math.max(0, openCount - 1);
+  if(openCount === 0){
+    document.body.classList.remove('modal-open');
+    document.body.style.top = '';
+    window.scrollTo(0, pinnedY);
+  }
+  setTimeout(function(){ el.hidden = true; }, 280);
+}
+Array.prototype.forEach.call(document.querySelectorAll('.modal-backdrop'), function(bd){
+  bd.addEventListener('click', function(e){
+    if(e.target === bd || e.target.closest('[data-close]')) closeSheet(bd);
+  });
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    var open = document.querySelector('.modal-backdrop.show');
+    if(open){ closeSheet(open); return; }
+  }
+  if(openCount) return;
+  var t = e.target.tagName;
+  if(t === 'INPUT' || t === 'TEXTAREA') return;
+  if(e.key === 'ArrowLeft') shiftWeek(-1);
+  if(e.key === 'ArrowRight') shiftWeek(1);
+});
+
+/* ---------- нотатка дня ---------- */
+var noteKey = null;
+function openNote(k){
+  noteKey = k;
+  var d = parseKey(k);
+  $('noteTitle').textContent = DOW_FULL[dowIdx(d)] + ', ' + fmtShort(d);
+  $('noteText').value = S.notes[k] || '';
+  openSheet($('noteModal'));
+  setTimeout(function(){ $('noteText').focus(); }, 320);
+}
+$('noteSave').addEventListener('click', function(){
+  if(!noteKey) return;
+  var v = $('noteText').value.trim();
+  if(v) S.notes[noteKey] = v; else delete S.notes[noteKey];
+  save(); refreshDayCard(noteKey); renderHero();
+  closeSheet($('noteModal'));
+});
+$('noteDel').addEventListener('click', function(){
+  if(!noteKey) return;
+  delete S.notes[noteKey];
+  save(); refreshDayCard(noteKey); renderHero();
+  closeSheet($('noteModal'));
+});
+
+/* ---------- дії з тижнем ---------- */
+function mergeInto(k, ids){
+  var cur = (S.days[k] || []).concat(ids);
+  S.days[k] = MEALS.filter(function(m){ return cur.indexOf(m.id) >= 0; }).map(function(m){ return m.id; });
+}
+$('repeatBtn').addEventListener('click', function(){
+  var added = 0;
+  for(var i = 0; i < daysInWeek(); i++){
+    var src = key(addDays(monday, i-7)), dst = key(addDays(monday, i));
+    var sm = S.days[src] || [];
+    if(sm.length){ mergeInto(dst, sm); added++; }
+    var sn = (S.notes[src] || '').trim();
+    if(sn && !noteOf(dst)) S.notes[dst] = sn;
+  }
+  if(!added){ toast('Минулий тиждень порожній'); return; }
+  save(); renderWeek(); renderHero(); toast('Скопійовано з минулого тижня');
+});
+$('clearBtn').addEventListener('click', function(){
+  if(weekCount() === 0){ toast('Тиждень і так порожній'); return; }
+  if(!confirm('Прибрати всі позначки цього тижня?')) return;
+  for(var i = 0; i < daysInWeek(); i++){
+    var k = key(addDays(monday, i));
+    delete S.days[k]; delete S.notes[k];
+  }
+  save(); renderWeek(); renderHero(); toast('Тиждень очищено');
+});
+function weekText(){
+  var head = ((S.child || '').trim() || 'Тиждень') + ' · ' + weekRangeText(), lines = [];
+  for(var i = 0; i < daysInWeek(); i++){
+    var d = addDays(monday, i), k = key(d), ls = labelsOf(k);
+    if(!ls.length) continue;
+    var n = noteOf(k);
+    lines.push(DOW_SHORT[dowIdx(d)] + ' ' + fmtShort(d) + ' — ' + ls.join(', ') + (n ? ' (' + n + ')' : ''));
+  }
+  return head + '\n' + (lines.length ? lines.join('\n') : 'Нічого готувати');
+}
+$('shareBtn').addEventListener('click', function(){
+  var text = weekText();
+  if(navigator.share){
+    navigator.share({title:'Ланчбокс', text:text}).catch(function(){});
+    return;
+  }
+  copyText(text).then(function(){ toast('Скопійовано'); }, function(){ toast('Не вдалося скопіювати'); });
+});
+
+/* ---------- свайп по тижнях ---------- */
+var sx = 0, sy = 0, tracking = false, decided = false, horiz = false, suppressClick = false;
+var daysEl = $('days');
+daysEl.addEventListener('touchstart', function(e){
+  if(e.touches.length !== 1) return;
+  sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+  tracking = true; decided = false; horiz = false;
+}, {passive:true});
+daysEl.addEventListener('touchmove', function(e){
+  if(!tracking || decided) return;
+  var dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+  if(Math.abs(dx) > 8 || Math.abs(dy) > 8){
+    decided = true;
+    horiz = Math.abs(dx) > Math.abs(dy) * 1.4;   /* вертикальний намір — віддаємо сторінці */
+  }
+}, {passive:true});
+daysEl.addEventListener('touchend', function(e){
+  if(!tracking) return;
+  tracking = false;
+  if(!horiz) return;
+  var dx = e.changedTouches[0].clientX - sx;
+  if(Math.abs(dx) > 10){
+    suppressClick = true;
+    setTimeout(function(){ suppressClick = false; }, 400);
+  }
+  if(Math.abs(dx) > 60) shiftWeek(dx < 0 ? 1 : -1);
+}, {passive:true});
+
+$('prevWeek').addEventListener('click', function(){ shiftWeek(-1); });
+$('nextWeek').addEventListener('click', function(){ shiftWeek(1); });
+$('weekLabel').addEventListener('click', function(){
+  if(isCurrentWeek()) return;
+  var home = defaultMonday(), back = home < monday ? -1 : 1;
+  monday = home;
+  renderWeek(back);
+});
+$('hintSlot').addEventListener('click', function(e){
+  if(e.target.closest('#applyTplBtn')) applyTemplate();
+});
+
+/* ---------- налаштування ---------- */
+function renderMealPick(){
+  $('mealPick').innerHTML = MEALS.map(function(m){
+    var on = S.meals.indexOf(m.id) >= 0;
+    return '<button class="chip' + (on ? ' on' : '') + '" type="button" data-meal="' + m.id
+         + '" aria-pressed="' + on + '">' + m.label + '</button>';
+  }).join('');
+}
+$('mealPick').addEventListener('click', function(e){
+  var chip = e.target.closest('.chip');
+  if(!chip) return;
+  var id = chip.dataset.meal, i = S.meals.indexOf(id);
+  if(i >= 0){
+    if(S.meals.length === 1){ toast('Хоча б один прийом їжі має лишитись'); return; }
+    S.meals.splice(i, 1);
+  }else{
+    S.meals.push(id);
+  }
+  save(); renderMealPick(); renderAll(); renderTemplate();
+});
+$('settingsBtn').addEventListener('click', function(){
+  $('childName').value = S.child || '';
+  $('weekendSw').classList.toggle('on', S.showWeekend);
+  $('weekendSw').setAttribute('aria-checked', S.showWeekend);
+  renderMealPick(); renderTplSummary();
+  openSheet($('setModal'));
+});
+$('childName').addEventListener('input', function(){
+  S.child = $('childName').value.slice(0, 40);
+  save(); renderSub();
+});
+$('weekendSw').addEventListener('click', function(){
+  var wasHome = isCurrentWeek();
+  S.showWeekend = !S.showWeekend;
+  this.classList.toggle('on', S.showWeekend);
+  this.setAttribute('aria-checked', S.showWeekend);
+  if(wasHome) monday = defaultMonday();
+  save(); renderWeek(); renderTemplate();
+});
+$('exportBtn').addEventListener('click', function(){
+  copyText(JSON.stringify(S)).then(
+    function(){ toast('Копію скопійовано в буфер'); },
+    function(){ toast('Не вдалося скопіювати'); }
+  );
+});
+$('importBtn').addEventListener('click', function(){
+  var raw = prompt('Вставте раніше скопійовану резервну копію:');
+  if(!raw) return;
+  try{
+    var p = JSON.parse(raw);
+    if(!p || typeof p !== 'object') throw 0;
+    localStorage.setItem(LS, JSON.stringify(p));
+    S = load(); save();
+    renderAll(); renderMealPick(); renderTplSummary();
+    toast('Дані відновлено');
+  }catch(e){ toast('Не схоже на резервну копію'); }
+});
+$('wipeBtn').addEventListener('click', function(){
+  if(!confirm('Стерти всі позначки, нотатки й налаштування?')) return;
+  try{ localStorage.removeItem(LS); }catch(e){}
+  S = fresh(); save();
+  monday = defaultMonday();
+  renderAll(); renderMealPick(); renderTplSummary();
+  closeSheet($('setModal'));
+  toast('Дані стерто');
+});
+
+/* ---------- щотижневий розклад ---------- */
+function renderTemplate(){
+  var out = '';
+  for(var i = 0; i < daysInWeek(); i++){
+    var t = S.template[i] || [];
+    out += '<div class="tpl-day"><div class="n">' + DOW_FULL[i] + '</div><div class="chips">'
+         + activeMeals().map(function(m){
+             var on = t.indexOf(m.id) >= 0;
+             return '<button class="chip' + (on ? ' on' : '') + '" type="button" data-d="' + i
+                  + '" data-m="' + m.id + '" aria-pressed="' + on + '">' + m.label + '</button>';
+           }).join('')
+         + '</div></div>';
+  }
+  $('tplDays').innerHTML = out;
+}
+function renderTplSummary(){
+  var n = templateCount(), days = [];
+  for(var i = 0; i < 7; i++) if((S.template[i] || []).length) days.push(DOW_SHORT[i]);
+  $('tplSum').textContent = n
+    ? days.join(', ') + ' · ' + n + ' ' + plural(n, 'страва', 'страви', 'страв')
+    : 'Постійні дні, які готуєте самі';
+}
+$('tplDays').addEventListener('click', function(e){
+  var chip = e.target.closest('.chip');
+  if(!chip) return;
+  var d = +chip.dataset.d, id = chip.dataset.m;
+  var arr = (S.template[d] || []).slice(), i = arr.indexOf(id);
+  if(i >= 0) arr.splice(i, 1); else arr.push(id);
+  S.template[d] = MEALS.filter(function(m){ return arr.indexOf(m.id) >= 0; }).map(function(m){ return m.id; });
+  if(!S.template[d].length) delete S.template[d];
+  save();
+  var on = (S.template[d] || []).indexOf(id) >= 0;
+  chip.classList.toggle('on', on);
+  chip.setAttribute('aria-pressed', on);
+  chip.classList.remove('pop'); void chip.offsetWidth; chip.classList.add('pop');
+  renderTplSummary(); renderHint(); haptic();
+});
+$('openTemplate').addEventListener('click', function(){
+  renderTemplate();
+  openSheet($('tplModal'));
+});
+function applyTemplate(){
+  if(!templateCount()){ toast('Розклад ще не налаштований'); return; }
+  var added = 0;
+  for(var i = 0; i < daysInWeek(); i++){
+    var t = (S.template[i] || []).filter(function(id){ return S.meals.indexOf(id) >= 0; });
+    if(!t.length) continue;
+    mergeInto(key(addDays(monday, i)), t);
+    added++;
+  }
+  if(!added){ toast('Нічого додавати'); return; }
+  save(); renderWeek(); renderHero(); toast('Тиждень заповнено за розкладом');
+}
+$('tplApply').addEventListener('click', function(){
+  applyTemplate();
+  closeSheet($('tplModal'));
+});
+
+/* ---------- старт ---------- */
+renderAll();
+
+/* Повернулися в застосунок наступного дня — «сьогодні» має переїхати. */
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) return;
+  var k = key(today());
+  if(k === lastTodayKey) return;
+  var wasHome = isCurrentWeek();
+  lastTodayKey = k;
+  if(wasHome) monday = defaultMonday();
+  renderAll();
+});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+
+})();
+</script>
+</body>
+</html>
